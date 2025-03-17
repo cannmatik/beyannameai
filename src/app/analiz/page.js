@@ -8,21 +8,29 @@ import Link from "next/link";
 import "./analiz-style.css";
 
 export default function AnalizPage() {
-  const [files, setFiles] = useState([]); // beyanname tablosu
+  // Beyanname, kuyruk ve geçmiş analizler için state'ler
+  const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [queueItems, setQueueItems] = useState([]); // analysis_queue
-  const [analysisRows, setAnalysisRows] = useState([]); // beyanname_analysis
+  const [queueItems, setQueueItems] = useState([]);
+  const [analysisRows, setAnalysisRows] = useState([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false); // enqueue butonu
-  const [loadingPull, setLoadingPull] = useState({}); // pull butonları
+  const [loading, setLoading] = useState(false);
+  const [loadingPull, setLoadingPull] = useState({});  
+  const [pullStatus, setPullStatus] = useState(""); // Durum mesajı
 
-  // 1) Beyanname tablosunu çek
+  useEffect(() => {
+    fetchBeyanname();
+    fetchQueue();
+    fetchPreviousAnalyses();
+  }, []);
+
+  // Beyanname kayıtlarını çek
   async function fetchBeyanname() {
     setError("");
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user) {
-        setError("Please log in.");
+        setError("Lütfen giriş yapınız.");
         return;
       }
       const { data, error } = await supabase
@@ -31,81 +39,58 @@ export default function AnalizPage() {
         .eq("user_id", userData.user.id)
         .order("donem_yil", { ascending: false })
         .order("donem_ay", { ascending: false });
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
       setFiles(data || []);
     } catch (err) {
       setError(err.message);
     }
   }
 
-  // 2) Queue'yu çek
+  // Kuyruk (analysis_queue) kayıtlarını çek
   async function fetchQueue() {
     setError("");
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        setError("No session found. Please login.");
-        return;
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
       const res = await fetch("/api/list-queue", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to list queue");
+      if (!res.ok) throw new Error(json.error || "Kuyruk listesi çekilemedi.");
       setQueueItems(json.items || []);
     } catch (err) {
       setError(err.message);
     }
   }
 
-  // 3) Previous analyses
+  // Önceki analizleri (beyanname_analysis) çek
   async function fetchPreviousAnalyses() {
     setError("");
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const res = await fetch("/api/previous-analyses", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "Failed to fetch previous analyses");
-      }
+      if (!res.ok) throw new Error(json.error || "Önceki analizler çekilemedi.");
       setAnalysisRows(json.analyses || []);
     } catch (err) {
       setError(err.message);
     }
   }
 
-  // useEffect => sayfa ilk açılışta 3 veriyi de çek
-  useEffect(() => {
-    fetchBeyanname();
-    fetchQueue();
-    fetchPreviousAnalyses();
-  }, []);
-
-  // 4) Enqueue Analysis
+  // Seçilen beyanname dosyalarını kuyruk ekle (pending)
   async function handleEnqueue() {
     if (selectedFiles.length === 0) {
-      setError("Select at least one file.");
+      setError("Lütfen en az bir beyanname seçiniz.");
       return;
     }
     setError("");
     setLoading(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("No session found. Please log in.");
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Giriş yapınız (session yok).");
 
       const payloadData = selectedFiles.map((f) => ({
         firma_adi: f.firma_adi,
@@ -123,11 +108,8 @@ export default function AnalizPage() {
         },
         body: JSON.stringify({ data: payloadData }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "Enqueue error");
-      }
-      // tabloyu yenile
+      const js = await res.json();
+      if (!res.ok) throw new Error(js.error || "Kuyruğa eklenemedi.");
       await fetchQueue();
     } catch (err) {
       setError(err.message);
@@ -136,136 +118,109 @@ export default function AnalizPage() {
     }
   }
 
-  // 5) Pull from GPT
+  // ChatGPT'den manuel çek (pending/error kayıtları için)
   async function handlePull(queueId) {
     setError("");
+    setPullStatus("Cevap çekiliyor...");
     setLoadingPull((prev) => ({ ...prev, [queueId]: true }));
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("No session found. Please log in.");
-      }
-
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Giriş yapınız.");
       const res = await fetch(`/api/manual-pull?queue_id=${queueId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "Pull error");
-      }
-      // tabloyu yenile
+      if (!res.ok) throw new Error(json.error || "ChatGPT çekilemedi.");
+
+      setPullStatus("Analiz tamamlandı.");
+      // Kuyruk ve geçmiş analizleri yenile
       await fetchQueue();
+      await fetchPreviousAnalyses();
+      // Durum mesajını 3 saniye sonra temizle
+      setTimeout(() => setPullStatus(""), 3000);
     } catch (err) {
       setError(err.message);
+      setPullStatus("");
     } finally {
       setLoadingPull((prev) => ({ ...prev, [queueId]: false }));
     }
   }
 
   // DataGrid kolonları
-  const beyannameColumns = [
+  const beyannameCols = [
     { field: "firma_adi", headerName: "Firma", flex: 1 },
     { field: "vergi_no", headerName: "Vergi No", flex: 1 },
-    { field: "donem_yil", headerName: "Year", width: 100 },
-    { field: "donem_ay", headerName: "Month", width: 100 },
+    { field: "donem_yil", headerName: "Yıl", width: 100 },
+    { field: "donem_ay", headerName: "Ay", width: 100 },
   ];
 
-  const queueColumns = [
-    { field: "id", headerName: "ID", width: 220 },
-    { field: "status", headerName: "Status", width: 120 },
-    {
-      field: "result",
-      headerName: "GPT Result",
-      flex: 1,
-      renderCell: (params) => {
-        const val = params.value;
-        if (!val) return "";
-        return val.length > 50 ? val.substring(0, 50) + "..." : val;
-      },
-    },
+  const queueCols = [
+    { field: "id", headerName: "ID", width: 230 },
+    { field: "status", headerName: "Durum", width: 100 },
     {
       field: "pdf_url",
       headerName: "PDF",
-      width: 110,
-      renderCell: (params) => {
-        if (!params.value) return "—";
-        return (
-          <a href={params.value} target="_blank" rel="noopener noreferrer">
-            Download
-          </a>
-        );
+      width: 100,
+      renderCell: (p) => {
+        if (!p.value) return "—";
+        return <a href={p.value} target="_blank">PDF</a>;
       },
     },
     {
       field: "created_at",
-      headerName: "Created",
-      width: 170,
-      renderCell: (params) => {
-        if (!params.value) return "";
-        return new Date(params.value).toLocaleString("tr-TR");
+      headerName: "Tarih",
+      width: 160,
+      renderCell: (p) => {
+        if (!p.value) return "";
+        return new Date(p.value).toLocaleString("tr-TR");
       },
     },
     {
-      field: "actions",
-      headerName: "Actions",
-      width: 180,
-      renderCell: (params) => {
-        const row = params.row;
-        
+      field: "islem",
+      headerName: "İşlem",
+      width: 150,
+      renderCell: (p) => {
+        const row = p.row;
         if (row.status === "pending") {
-          return (
-            <Button variant="contained" onClick={() => handlePull(row.id)}>
-              Pull from GPT
-            </Button>
-          );
+          return <Button variant="contained" onClick={() => handlePull(row.id)}>GPT'den Çek</Button>;
         } else if (row.status === "error") {
-          return (
-            <Button variant="contained" color="error" onClick={() => handlePull(row.id)}>
-              Try Again
-            </Button>
-          );
+          return <Button variant="contained" color="error" onClick={() => handlePull(row.id)}>Tekrar Dene</Button>;
         }
-        // "done" görmeyeceğiz, ama yine de "—"
         return "—";
       },
-    }
+    },
   ];
 
-  const oldAnalysisColumns = [
-    { field: "id", headerName: "Analysis ID", width: 180 },
-    {
-      field: "created_at",
-      headerName: "Date",
-      width: 180,
-      renderCell: (params) => {
-        const dateStr = new Date(params.value).toLocaleString("tr-TR");
-        return <span>{dateStr}</span>;
-      },
-    },
+  const oldAnalysisCols = [
+    { field: "id", headerName: "ID", width: 220 },
     {
       field: "pdf_url",
       headerName: "PDF",
-      width: 120,
-      renderCell: (params) => {
-        if (!params.value) return "None";
-        return (
-          <a href={params.value} target="_blank" rel="noopener noreferrer">
-            Download
-          </a>
-        );
+      width: 150,
+      renderCell: (p) => {
+        if (!p.value) return "—";
+        return <a href={p.value} target="_blank">İndir</a>;
       },
     },
     {
       field: "analysis_response",
-      headerName: "Analysis Text",
+      headerName: "GPT Metin",
       flex: 1,
-      renderCell: (params) => {
-        const text = params.value || "";
-        return text.length > 60 ? text.substring(0, 60) + "..." : text;
+      renderCell: (p) => {
+        if (!p.value) return "";
+        const t = p.value;
+        return t.length > 70 ? t.substring(0,70) + "..." : t;
+      },
+    },
+    {
+      field: "created_at",
+      headerName: "Tarih",
+      width: 160,
+      renderCell: (p) => {
+        if (!p.value) return "";
+        return new Date(p.value).toLocaleString("tr-TR");
       },
     },
   ];
@@ -273,61 +228,47 @@ export default function AnalizPage() {
   return (
     <Box className="analiz-container">
       <Box className="analiz-header">
-        <Typography variant="h4">Beyanname Analysis (Manual Queue)</Typography>
-        <Link href="/dashboard" className="nav-link">
-          Dashboard
-        </Link>
+        <Typography variant="h4">Beyanname Analiz Platformu</Typography>
+        <Link href="/dashboard" className="nav-link">Dashboard</Link>
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {pullStatus && <Alert severity="info">{pullStatus}</Alert>}
 
-      {/* Beyanname Tablosu */}
-      <Typography variant="h6" gutterBottom>
-        Beyanname Kayıtları
-      </Typography>
+      <Typography variant="h6" sx={{ mt: 2 }}>Beyanname Tablosu</Typography>
       <div className="table-wrapper">
         <DataGrid
           className="data-table"
           rows={files.map((f) => ({ ...f, id: f.id }))}
-          columns={beyannameColumns}
+          columns={beyannameCols}
           checkboxSelection
           disableRowSelectionOnClick
           onRowSelectionModelChange={(sel) => {
-            const selected = files.filter((row) => sel.includes(row.id));
-            setSelectedFiles(selected);
+            const secilen = files.filter((row) => sel.includes(row.id));
+            setSelectedFiles(secilen);
           }}
         />
       </div>
-      <Button
-        variant="contained"
-        onClick={handleEnqueue}
-        disabled={loading || selectedFiles.length === 0}
-      >
-        {loading ? <CircularProgress size={24} /> : `Enqueue Analysis (${selectedFiles.length})`}
+      <Button variant="contained" disabled={loading || selectedFiles.length === 0} onClick={handleEnqueue}>
+        {loading ? <CircularProgress size={20} /> : `Seçili (${selectedFiles.length}) Analize Gönder`}
       </Button>
 
-      {/* Queue */}
-      <Typography variant="h6" style={{ marginTop: 30 }} gutterBottom>
-        Queue (Pending / Done)
-      </Typography>
-      <div style={{ height: 400, marginBottom: 20 }}>
+      <Typography variant="h6" sx={{ mt: 4 }}>Kuyruk (Pending / Error)</Typography>
+      <div style={{ height: 300 }}>
         <DataGrid
-          rows={queueItems.map((x) => ({ ...x, id: x.id }))}
-          columns={queueColumns}
           className="data-table"
+          rows={queueItems.map((q) => ({ ...q, id: q.id }))}
+          columns={queueCols}
           pageSizeOptions={[5, 10, 25]}
         />
       </div>
 
-      {/* Previous Analyses */}
-      <Typography variant="h6" style={{ marginTop: 30 }} gutterBottom>
-        Previous Analyses
-      </Typography>
-      <div style={{ height: 400 }}>
+      <Typography variant="h6" sx={{ mt: 4 }}>Geçmiş Analizler</Typography>
+      <div style={{ height: 300 }}>
         <DataGrid
-          rows={analysisRows.map((x) => ({ ...x, id: x.id }))}
-          columns={oldAnalysisColumns}
           className="data-table"
+          rows={analysisRows.map((a) => ({ ...a, id: a.id }))}
+          columns={oldAnalysisCols}
           pageSizeOptions={[5, 10, 25]}
         />
       </div>
