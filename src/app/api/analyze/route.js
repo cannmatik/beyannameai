@@ -5,6 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 import path from "path";
 
+// Bu ayar, Next.js'in bu route'u Node.js ortamında çalıştırmasını garanti eder
 export const runtime = "nodejs";
 
 export async function POST(req) {
@@ -14,18 +15,23 @@ export async function POST(req) {
     if (!token) {
       return NextResponse.json({ error: "Yetkisiz erişim: Token eksik" }, { status: 401 });
     }
-    const { data: { user } } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(token);
+
     if (!user) {
       return NextResponse.json({ error: "Kullanıcı doğrulanamadı." }, { status: 401 });
     }
 
-    // 2) Gövdeden beyanname verisi
+    // 2) Gövdeden beyanname verisini al
+    // Gönderdiğin body: { data: beyannameData }
     const { data: beyannameData } = await req.json();
     if (!beyannameData || !beyannameData.length) {
       return NextResponse.json({ error: "Beyanname verileri eksik." }, { status: 400 });
     }
 
-    // 3) ChatGPT Prompt – Derinlemesine analiz (ama 8k gpt-4)
+    // 3) ChatGPT Prompt – Derinlemesine analiz
+    // Bu kısım GPT-4 olarak ayarlı. Eğer GPT-4 yetkin yoksa "gpt-3.5-turbo" yapabilirsin.
     const prompt = `
 Lütfen aşağıdaki beyannameler ışığında firmanın mali durumunu, işlem hacmini, 
 risklerini ve geleceğe yönelik projeksiyonlarını detaylı bir biçimde analiz et. 
@@ -46,14 +52,16 @@ Beyanname Verileri:
 ${JSON.stringify(beyannameData)}
 `;
 
-    // gpt-4 (8k)
+    // GPT API'ye istek
     const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // OPENAI_API_KEY'in Vercel ortam değişkenlerinde tanımlı olduğundan emin ol
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
+        // İstersen burayı "gpt-3.5-turbo" olarak değiştirebilirsin:
         model: "gpt-4",
         messages: [
           {
@@ -65,40 +73,56 @@ ${JSON.stringify(beyannameData)}
             content: prompt,
           },
         ],
-        max_tokens: 3500, // gpt-4 (8k) için uygun
+        max_tokens: 3500, // GPT-4 (8k) için yeterli olabilir
         temperature: 0.7,
       }),
     });
 
+    // OpenAI cevabını JSON'a çevir
     const openAiData = await openAiRes.json();
+
+    // Başarısız durumdaysa burada daha net hata mesajı yakalıyoruz
     if (!openAiRes.ok) {
-      throw new Error(openAiData.error?.message || "OpenAI API hatası.");
+      console.error("OpenAI API Error:", openAiData);
+      // Dönen hatayı kullanıcının da görebileceği şekilde geri dönelim
+      return NextResponse.json(
+        {
+          error: openAiData.error?.message || "OpenAI API hatası.",
+          details: openAiData.error,
+        },
+        { status: openAiRes.status }
+      );
     }
+
+    // Eğer hata yoksa, analiz metni
     const analysisText = openAiData.choices[0].message.content.trim();
 
-    // 4) PDF oluşturma
+    // 4) PDF oluşturma işlemleri
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
     const regularPath = path.join(process.cwd(), "src", "fonts", "Montserrat-Regular.ttf");
     const boldPath = path.join(process.cwd(), "src", "fonts", "Montserrat-Bold.ttf");
 
+    // Montserrat fontlarını okuyoruz
     const regularBytes = fs.readFileSync(regularPath);
     const boldBytes = fs.readFileSync(boldPath);
 
+    // Fontları PDF'e göm
     const regularFont = await pdfDoc.embedFont(regularBytes);
     const boldFont = await pdfDoc.embedFont(boldBytes);
 
-    // Sayfa ayarları
+    // Yeni bir sayfa ekle
     let page = pdfDoc.addPage();
     const { width: pageWidth, height: pageHeight } = page.getSize();
 
+    // Kenar boşlukları vs.
     const marginLeft = 50;
     const marginTop = 60;
     const marginBottom = 60;
     const lineHeight = 16;
 
-    // Üst Başlık Kutusu
+    // Üst başlık kutusu
     page.drawRectangle({
       x: marginLeft - 5,
       y: pageHeight - marginTop - 60,
@@ -107,7 +131,7 @@ ${JSON.stringify(beyannameData)}
       color: rgb(0.9, 0.9, 0.9),
     });
 
-    // Ana Başlık
+    // Ana başlık
     page.setFont(boldFont);
     page.setFontSize(16);
     page.drawText("BEYANNAME API - Detaylı Mali Analiz", {
@@ -118,13 +142,15 @@ ${JSON.stringify(beyannameData)}
 
     let cursorY = pageHeight - marginTop - 80;
 
-    // 5) Markdown Metni işleme
+    // 5) Markdown metni satır satır PDF'e çizelim
     const rawLines = analysisText.split("\n");
 
     for (const rawLine of rawLines) {
+      // wrapText ile satırları belli uzunlukta sarıyoruz
       const lines = wrapText(rawLine, 90);
 
       for (const line of lines) {
+        // Sayfa sonuna geldiysek yeni sayfa
         if (cursorY < marginBottom) {
           page = pdfDoc.addPage();
           page.setFont(regularFont);
@@ -132,6 +158,7 @@ ${JSON.stringify(beyannameData)}
           cursorY = page.getSize().height - marginTop;
         }
 
+        // Markdown başlıklarına göre font ayarı
         if (line.startsWith("# ")) {
           // "# " => Büyük Başlık
           const text = line.replace("# ", "").trim();
@@ -161,7 +188,7 @@ ${JSON.stringify(beyannameData)}
           page.drawText("• " + text, { x: marginLeft + 20, y: cursorY });
           cursorY -= lineHeight;
         } else {
-          // Normal
+          // Normal metin
           page.setFont(regularFont);
           page.setFontSize(12);
           page.drawText(line, { x: marginLeft, y: cursorY });
@@ -170,23 +197,25 @@ ${JSON.stringify(beyannameData)}
       }
     }
 
-    // 6) Önceki Analizler
+    // 6) Önceki Analizleri de PDF'e ekliyoruz
     const { data: oldAnalyses, error: oldError } = await supabase
       .from("beyanname_analysis")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
+
     if (oldError) {
       throw new Error(`Önceki analizler çekilemedi: ${oldError.message}`);
     }
 
+    // Yeni sayfa
     page = pdfDoc.addPage();
     cursorY = page.getSize().height - marginTop;
 
     page.setFont(boldFont);
     page.setFontSize(14);
     page.drawText("Önceki Analizler", { x: marginLeft, y: cursorY });
-    cursorY -= (lineHeight + 10);
+    cursorY -= lineHeight + 10;
 
     if (!oldAnalyses || oldAnalyses.length === 0) {
       page.setFont(regularFont);
@@ -197,18 +226,20 @@ ${JSON.stringify(beyannameData)}
       page.setFontSize(12);
       page.drawText("Tarih", { x: marginLeft, y: cursorY });
       page.drawText("Analiz Özeti", { x: marginLeft + 130, y: cursorY });
-      cursorY -= (lineHeight + 5);
+      cursorY -= lineHeight + 5;
 
+      // Alt çizgi
       page.drawLine({
         start: { x: marginLeft, y: cursorY },
         end: { x: pageWidth - marginLeft, y: cursorY },
         thickness: 1,
-        color: rgb(0,0,0),
+        color: rgb(0, 0, 0),
       });
-      cursorY -= (lineHeight - 5);
+      cursorY -= lineHeight - 5;
 
       page.setFont(regularFont);
       page.setFontSize(12);
+
       for (const item of oldAnalyses) {
         if (cursorY < marginBottom) {
           page = pdfDoc.addPage();
@@ -216,40 +247,41 @@ ${JSON.stringify(beyannameData)}
           page.setFontSize(12);
           cursorY = page.getSize().height - marginTop;
         }
+
         const dateStr = new Date(item.created_at).toLocaleString("tr-TR");
         page.drawText(dateStr, { x: marginLeft, y: cursorY });
 
-        const snippet = (item.analysis_response || "")
-          .substring(0, 80)
-          .replace(/\n/g, " ");
+        // Analiz metninin ilk 80 karakteri
+        const snippet = (item.analysis_response || "").substring(0, 80).replace(/\n/g, " ");
         page.drawText(snippet + "...", { x: marginLeft + 130, y: cursorY });
         cursorY -= lineHeight;
       }
     }
 
-    // 7) PDF kaydet
+    // 7) PDF'yi byte dizisi olarak kaydet
     const pdfBytes = await pdfDoc.save();
     const pdfBuffer = Buffer.from(pdfBytes);
 
-    // 8) Supabase'e Yükle
+    // 8) Supabase'e PDF olarak yükle
     const pdfFileName = `analysis_${Date.now()}.pdf`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("analyses")
       .upload(pdfFileName, pdfBuffer, { contentType: "application/pdf" });
+
     if (uploadError) {
       throw new Error(`PDF yüklenemedi: ${uploadError.message}`);
     }
 
-    const { data: publicData } = supabase.storage
-      .from("analyses")
-      .getPublicUrl(pdfFileName);
+    // Public URL al
+    const { data: publicData } = supabase.storage.from("analyses").getPublicUrl(pdfFileName);
     const pdf_url = publicData.publicUrl;
 
-    // 9) Kaydı DB'ye ekle
+    // 9) Analizi veritabanına kaydet
     await supabase.from("beyanname_analysis").insert([
       { user_id: user.id, analysis_response: analysisText, pdf_url },
     ]);
 
+    // Son olarak JSON dön
     return NextResponse.json({ response: analysisText, pdf_url });
   } catch (err) {
     console.error("Analiz Hatası:", err);
@@ -259,6 +291,7 @@ ${JSON.stringify(beyannameData)}
 
 /**
  * wrapText => metni maxChars kadar böler
+ * (Uzun satırları çoklu satıra bölmek için kullanılıyor)
  */
 function wrapText(text, maxChars) {
   const words = text.split(/\s+/);
