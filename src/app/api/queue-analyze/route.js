@@ -1,49 +1,44 @@
-// app/api/queue-analyze/route.js
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+import { v4 as uuidv4 } from "uuid";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req) {
   try {
-    // 1) Token kontrol
+    const { data } = await req.json();
+    if (!data || !Array.isArray(data)) {
+      return NextResponse.json({ error: "No data provided or invalid format" }, { status: 400 });
+    }
+
+    // Token'ı header'dan alıyoruz:
     const token = req.headers.get("authorization")?.split("Bearer ")[1];
     if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
+    }
+    
+    // Token ile kullanıcıyı doğrulayalım:
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (!user) {
+      return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
 
-    // 2) Kullanıcı doğrulama
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
-    }
+    // Kuyruk öğelerine ekleme işlemleri
+    const queueItems = data.map(item => ({
+      ...item,
+      analysis_uuid: uuidv4(),
+      status: "pending",
+    }));
 
-    // 3) Body'den veriyi al
-    const { data: payload } = await req.json(); 
-    if (!payload || payload.length === 0) {
-      return NextResponse.json({ error: "No data provided" }, { status: 400 });
-    }
-
-    // 4) analysis_queue tablosuna (status=pending) ekle
-    const { data: inserted, error: insertErr } = await supabase
+    const { error } = await supabase
       .from("analysis_queue")
-      .insert({
-        user_id: user.id,
-        payload,
-        status: "pending",
-      })
-      .select()
-      .single();
+      .insert(queueItems);
 
-    if (insertErr) {
-      throw new Error(insertErr.message);
-    }
+    if (error) throw new Error(error.message);
 
-    // 5) Yanıt
-    return NextResponse.json({ queue_id: inserted.id, status: "pending" });
+    return NextResponse.json({ message: "Kuyruğa eklendi", items: queueItems }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
