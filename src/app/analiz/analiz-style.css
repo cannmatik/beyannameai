@@ -1,0 +1,135 @@
+.analiz-container {
+  padding: 2rem;
+  background-color: #0d0d0d;
+  color: #f2f2f2;
+  min-height: 100vh;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* En üst header row */
+.analiz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Sağa sola itebilir, istersen center vs. */
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+/* nav-link: Dashboard butonu (link şeklinde) */
+.nav-link {
+  background-color: #555;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  transition: background-color 0.3s, color 0.3s;
+}
+.nav-link:hover {
+  background-color: #333;
+  color: #fff;
+}
+
+.analiz-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.table-wrapper {
+  height: 400px;
+  margin-bottom: 1rem;
+}
+
+.analiz-panel {
+  margin-bottom: 2rem;
+  background-color: #111;
+  padding: 1rem;
+  border-radius: 8px;
+  color: #f2f2f2;
+}
+
+.panel-heading {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  color: #1a73e8;
+}
+
+.action-section {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.analiz-button {
+  background-color: #1a73e8;
+  color: #fff;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.analiz-button:hover {
+  background-color: #1669c1;
+}
+
+.loading-bar {
+  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+.error-message {
+  text-align: center;
+  color: #ff4d4d;
+  margin-bottom: 1rem;
+}
+
+.analiz-result {
+  background-color: #222;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 2rem;
+  text-align: center;
+  color: #f2f2f2;
+}
+
+.pdf-download a {
+  color: #1a73e8;
+  text-decoration: underline;
+}
+
+.previous-analyses {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.analysis-item {
+  background-color: #333;
+  padding: 1rem;
+  border-radius: 8px;
+  color: #f2f2f2;
+}
+
+/* DataGrid tarzı */
+.data-table {
+  color: #f2f2f2 !important;
+}
+
+/* Tablonun sütun başlıkları (kolon header) => beyaz zemin, siyah, kalın yazı */
+.data-table .MuiDataGrid-columnHeaders {
+  background-color: #fff !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+
+/* Satır arkaplan, hover efekti */
+.data-table .MuiDataGrid-row {
+  background-color: #222 !important;
+}
+.data-table .MuiDataGrid-row:hover {
+  background-color: #333 !important;
+}
