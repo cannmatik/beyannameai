@@ -8,15 +8,14 @@ import Link from "next/link";
 import "./analiz-style.css";
 
 export default function AnalizPage() {
-  // Beyanname, kuyruk ve geçmiş analizler için state'ler
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [queueItems, setQueueItems] = useState([]);
   const [analysisRows, setAnalysisRows] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingPull, setLoadingPull] = useState({});  
-  const [pullStatus, setPullStatus] = useState(""); // Durum mesajı
+  const [loadingPull, setLoadingPull] = useState({});
+  const [pullStatus, setPullStatus] = useState({});
 
   useEffect(() => {
     fetchBeyanname();
@@ -24,7 +23,6 @@ export default function AnalizPage() {
     fetchPreviousAnalyses();
   }, []);
 
-  // Beyanname kayıtlarını çek
   async function fetchBeyanname() {
     setError("");
     try {
@@ -46,7 +44,6 @@ export default function AnalizPage() {
     }
   }
 
-  // Kuyruk (analysis_queue) kayıtlarını çek
   async function fetchQueue() {
     setError("");
     try {
@@ -63,7 +60,6 @@ export default function AnalizPage() {
     }
   }
 
-  // Önceki analizleri (beyanname_analysis) çek
   async function fetchPreviousAnalyses() {
     setError("");
     try {
@@ -80,7 +76,6 @@ export default function AnalizPage() {
     }
   }
 
-  // Seçilen beyanname dosyalarını kuyruk ekle (pending)
   async function handleEnqueue() {
     if (selectedFiles.length === 0) {
       setError("Lütfen en az bir beyanname seçiniz.");
@@ -118,37 +113,67 @@ export default function AnalizPage() {
     }
   }
 
-  // ChatGPT'den manuel çek (pending/error kayıtları için)
   async function handlePull(queueId) {
     setError("");
-    setPullStatus("Cevap çekiliyor...");
+    setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
     setLoadingPull((prev) => ({ ...prev, [queueId]: true }));
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Giriş yapınız.");
-      const res = await fetch(`/api/manual-pull?queue_id=${queueId}`, {
+
+      const startRes = await fetch(`/api/manual-pull?queue_id=${queueId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "ChatGPT çekilemedi.");
+      const startJson = await startRes.json();
+      if (!startRes.ok) throw new Error(startJson.error || "Analiz başlatılamadı.");
 
-      setPullStatus("Analiz tamamlandı.");
-      // Kuyruk ve geçmiş analizleri yenile
+      setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
       await fetchQueue();
-      await fetchPreviousAnalyses();
-      // Durum mesajını 3 saniye sonra temizle
-      setTimeout(() => setPullStatus(""), 3000);
     } catch (err) {
       setError(err.message);
-      setPullStatus("");
+      setPullStatus((prev) => ({ ...prev, [queueId]: "" }));
     } finally {
       setLoadingPull((prev) => ({ ...prev, [queueId]: false }));
     }
   }
 
-  // DataGrid kolonları
+  async function checkStatus(queueId) {
+    setError("");
+    setLoadingPull((prev) => ({ ...prev, [queueId]: true }));
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Giriş yapınız.");
+
+      const res = await fetch(`/api/manual-pull?queue_id=${queueId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Durum kontrolü başarısız.");
+
+      if (json.status === "completed") {
+        setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor tamam" }));
+        await fetchQueue();
+        await fetchPreviousAnalyses();
+        setTimeout(() => setPullStatus((prev) => ({ ...prev, [queueId]: "" })), 3000);
+      } else if (json.status === "error") {
+        setError("Analiz sırasında hata oluştu.");
+        setPullStatus((prev) => ({ ...prev, [queueId]: "" }));
+      } else {
+        setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
+      }
+    } catch (err) {
+      setError(err.message);
+      setPullStatus((prev) => ({ ...prev, [queueId]: "" }));
+    } finally {
+      setLoadingPull((prev) => ({ ...prev, [queueId]: false }));
+    }
+  }
+
   const beyannameCols = [
     { field: "firma_adi", headerName: "Firma", flex: 1 },
     { field: "vergi_no", headerName: "Vergi No", flex: 1 },
@@ -163,30 +188,44 @@ export default function AnalizPage() {
       field: "pdf_url",
       headerName: "PDF",
       width: 100,
-      renderCell: (p) => {
-        if (!p.value) return "—";
-        return <a href={p.value} target="_blank">PDF</a>;
-      },
+      renderCell: (p) => (!p.value ? "—" : <a href={p.value} target="_blank">PDF</a>),
     },
     {
       field: "created_at",
       headerName: "Tarih",
       width: 160,
-      renderCell: (p) => {
-        if (!p.value) return "";
-        return new Date(p.value).toLocaleString("tr-TR");
-      },
+      renderCell: (p) => (p.value ? new Date(p.value).toLocaleString("tr-TR") : ""),
     },
     {
       field: "islem",
       headerName: "İşlem",
-      width: 150,
+      width: 200,
       renderCell: (p) => {
         const row = p.row;
         if (row.status === "pending") {
-          return <Button variant="contained" onClick={() => handlePull(row.id)}>GPT'den Çek</Button>;
+          return (
+            <Button variant="contained" onClick={() => handlePull(row.id)}>
+              Analizi Başlat
+            </Button>
+          );
+        } else if (row.status === "processing") {
+          return (
+            <Button variant="outlined" onClick={() => checkStatus(row.id)}>
+              Durumu Sorgula
+            </Button>
+          );
         } else if (row.status === "error") {
-          return <Button variant="contained" color="error" onClick={() => handlePull(row.id)}>Tekrar Dene</Button>;
+          return (
+            <Button variant="contained" color="error" onClick={() => handlePull(row.id)}>
+              Tekrar Dene
+            </Button>
+          );
+        } else if (row.status === "completed") {
+          return (
+            <Button variant="contained" color="success" onClick={() => checkStatus(row.id)}>
+              Raporu Çek
+            </Button>
+          );
         }
         return "—";
       },
@@ -199,29 +238,19 @@ export default function AnalizPage() {
       field: "pdf_url",
       headerName: "PDF",
       width: 150,
-      renderCell: (p) => {
-        if (!p.value) return "—";
-        return <a href={p.value} target="_blank">İndir</a>;
-      },
+      renderCell: (p) => (!p.value ? "—" : <a href={p.value} target="_blank">İndir</a>),
     },
     {
       field: "analysis_response",
-      headerName: "GPT Metin",
+      headerName: "Claude Metin",
       flex: 1,
-      renderCell: (p) => {
-        if (!p.value) return "";
-        const t = p.value;
-        return t.length > 70 ? t.substring(0,70) + "..." : t;
-      },
+      renderCell: (p) => (p.value ? (p.value.length > 70 ? p.value.substring(0, 70) + "..." : p.value) : ""),
     },
     {
       field: "created_at",
       headerName: "Tarih",
       width: 160,
-      renderCell: (p) => {
-        if (!p.value) return "";
-        return new Date(p.value).toLocaleString("tr-TR");
-      },
+      renderCell: (p) => (p.value ? new Date(p.value).toLocaleString("tr-TR") : ""),
     },
   ];
 
@@ -233,7 +262,17 @@ export default function AnalizPage() {
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
-      {pullStatus && <Alert severity="info">{pullStatus}</Alert>}
+      {Object.keys(pullStatus).map((queueId) =>
+        pullStatus[queueId] ? (
+          <Alert
+            key={queueId}
+            severity={pullStatus[queueId] === "Rapor tamam" ? "success" : "warning"}
+          >
+            {pullStatus[queueId]}
+            {loadingPull[queueId] && <CircularProgress size={16} sx={{ ml: 1 }} />}
+          </Alert>
+        ) : null
+      )}
 
       <Typography variant="h6" sx={{ mt: 2 }}>Beyanname Tablosu</Typography>
       <div className="table-wrapper">

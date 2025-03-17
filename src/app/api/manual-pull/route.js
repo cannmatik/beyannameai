@@ -1,4 +1,3 @@
-// app/api/manual-pull/route.js
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -8,9 +7,42 @@ import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 import path from "path";
 
+export async function GET(req) {
+  const url = new URL(req.url);
+  const queueId = url.searchParams.get("queue_id");
+  if (!queueId) {
+    return NextResponse.json({ error: "queue_id eksik" }, { status: 400 });
+  }
+
+  const token = req.headers.get("authorization")?.split("Bearer ")[1];
+  if (!token) {
+    return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
+  }
+
+  const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) {
+    return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 401 });
+  }
+
+  const { data: queueItem } = await supabase
+    .from("analysis_queue")
+    .select("status, progress")
+    .eq("id", queueId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!queueItem) {
+    return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    status: queueItem.status,
+    progress: queueItem.progress || 0,
+  });
+}
+
 export async function POST(req) {
   try {
-    // 1) Yetki kontrolü
     const token = req.headers.get("authorization")?.split("Bearer ")[1];
     if (!token) {
       return NextResponse.json({ error: "Yetkisiz erişim: Token eksik" }, { status: 401 });
@@ -20,14 +52,12 @@ export async function POST(req) {
       return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 401 });
     }
 
-    // 2) URL üzerinden queue_id parametresini alıyoruz
     const url = new URL(req.url);
     const queueId = url.searchParams.get("queue_id");
     if (!queueId) {
       return NextResponse.json({ error: "queue_id eksik" }, { status: 400 });
     }
 
-    // 3) Kuyruk kaydını getir (sadece pending veya error durumundakiler işleme alınır)
     const { data: queueItem, error: qErr } = await supabase
       .from("analysis_queue")
       .select("*")
@@ -38,13 +68,16 @@ export async function POST(req) {
       return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
     }
     if (queueItem.status !== "pending" && queueItem.status !== "error") {
-      return NextResponse.json({ error: "Bu kayıt pending/error değil, tekrar çekilemez" }, { status: 400 });
+      return NextResponse.json({ error: "Bu kayıt pending/error değil" }, { status: 400 });
     }
 
-    // 4) ChatGPT isteği: GPT-4 (standart, 8k context) kullanılarak detaylı ve uzun rapor istiyoruz.
+    await supabase
+      .from("analysis_queue")
+      .update({ status: "processing", progress: 0 })
+      .eq("id", queueId);
+
     const prompt = `
-# BEYANNAME AI By Can Matik
-# Detaylı Finansal Rapor
+# Sorgera Beyanname AI Analiz Raporu
 
 Lütfen aşağıdaki XML formatındaki detaylı beyanname belgesini eksiksiz incele. 
 Raporunuzda şunlar yer almalıdır:
@@ -56,39 +89,46 @@ Raporunuzda şunlar yer almalıdır:
 Veriler:
 ${JSON.stringify(queueItem.payload, null, 2)}
 `;
-    const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+
+    await supabase.from("analysis_queue").update({ progress: 25 }).eq("id", queueId);
+
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "x-api-key": process.env.CLAUDE_API_KEY,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "gpt-4", // Tier 1 kullanımınızda GPT-4 (standart) kullanılacaktır.
+        model: "claude-3-opus-20240229",
         max_tokens: 3000,
         temperature: 1,
         messages: [
-          { role: "system", content: "Sen ileri düzey bir finans uzmanısın, detaylı ve kapsamlı analizler üret." },
           { role: "user", content: prompt },
-        ]
+          { role: "assistant", content: "Sen ileri düzey bir finans uzmanısın, detaylı ve kapsamlı analizler üret." },
+        ],
       }),
     });
-    const openAiData = await openAiRes.json();
-    if (!openAiRes.ok) {
+
+    await supabase.from("analysis_queue").update({ progress: 50 }).eq("id", queueId);
+
+    const claudeData = await claudeRes.json();
+    if (!claudeRes.ok) {
       await supabase.from("analysis_queue").update({
         status: "error",
-        result: openAiData.error?.message || "OpenAI hatası"
+        result: claudeData.error?.message || "Claude hatası",
       }).eq("id", queueId);
-      return NextResponse.json({ error: openAiData.error?.message || "OpenAI API Hatası" }, { status: 500 });
+      return NextResponse.json({ error: claudeData.error?.message || "Claude API Hatası" }, { status: 500 });
     }
-    const gptAnswer = openAiData.choices[0].message.content.trim();
+    const gptAnswer = claudeData.content[0].text.trim();
 
-    // 5) PDF oluşturma: Gelişmiş formatlama
+    await supabase.from("analysis_queue").update({ progress: 75 }).eq("id", queueId);
+
     let pdfUrl = null;
     try {
       const pdfDoc = await PDFDocument.create();
       pdfDoc.registerFontkit(fontkit);
 
-      // Fontları yükle: Regular ve Bold
       const regularFontPath = path.join(process.cwd(), "src", "fonts", "Montserrat-Regular.ttf");
       const boldFontPath = path.join(process.cwd(), "src", "fonts", "Montserrat-Bold.ttf");
       const regularFontBytes = fs.readFileSync(regularFontPath);
@@ -99,16 +139,14 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       let page = pdfDoc.addPage();
       let { width, height } = page.getSize();
 
-      // Margin ayarları
       const marginLeft = 50;
       const marginRight = 50;
       const marginTop = 60;
       const marginBottom = 60;
       let cursorY = height - marginTop;
 
-      // Üst başlık: İki satıra bölünmüş
-      const titleLine1 = "BEYANNAME AI By Can Matik";
-      const titleLine2 = "Detaylı Finansal Rapor";
+      const titleLine1 = "Sorgera Beyanname AI";
+      const titleLine2 = "Analiz Raporu";
       const titleFontSize = 20;
       const titleWidth1 = boldFont.widthOfTextAtSize(titleLine1, titleFontSize);
       const titleWidth2 = boldFont.widthOfTextAtSize(titleLine2, titleFontSize);
@@ -128,7 +166,6 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       page.drawText(titleLine2, { x: titleX2, y: cursorY - 40, color: rgb(0, 0, 0) });
       cursorY -= (titleBlockHeight + 10);
 
-      // Gönderim Tarihi (Türkiye saatine göre)
       const submissionDate = new Date(queueItem.created_at || Date.now())
         .toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
       page.setFont(regularFont);
@@ -136,7 +173,6 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       page.drawText(`Gönderim Tarihi: ${submissionDate}`, { x: marginLeft, y: cursorY });
       cursorY -= 20;
 
-      // İncelenen Belgeler: Tüm belge bilgilerini ekle
       let reviewedDocs = "";
       if (Array.isArray(queueItem.payload)) {
         reviewedDocs = queueItem.payload.map(doc => {
@@ -165,7 +201,6 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       });
       cursorY -= 10;
 
-      // Ayırıcı çizgi
       page.drawLine({
         start: { x: marginLeft, y: cursorY },
         end: { x: width - marginRight, y: cursorY },
@@ -174,7 +209,6 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       });
       cursorY -= 20;
 
-      // Analiz Metni: GPT yanıtını satır satır, markdown formatını dikkate alarak yaz
       const analysisLines = gptAnswer.split("\n");
       for (let line of analysisLines) {
         if (line.trim() === "") {
@@ -213,11 +247,22 @@ ${JSON.stringify(queueItem.payload, null, 2)}
         cursorY -= 5;
       }
 
-      // PDF'i byte array'e çevir
+      if (cursorY < marginBottom + 20) {
+        page = pdfDoc.addPage();
+        ({ width, height } = page.getSize());
+        cursorY = height - marginTop;
+      }
+      page.setFont(regularFont);
+      page.setFontSize(10);
+      page.drawText("Sorgera Beyanname AI tarafından oluşturulmuştur", {
+        x: marginLeft,
+        y: marginBottom,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
       const pdfBytes = await pdfDoc.save();
       const pdfBuffer = Buffer.from(pdfBytes);
 
-      // Supabase Storage'a yükle
       const fileName = `manual_analysis_${Date.now()}.pdf`;
       const { error: uploadErr } = await supabase.storage
         .from("analyses")
@@ -230,26 +275,27 @@ ${JSON.stringify(queueItem.payload, null, 2)}
       console.error("PDF oluşturma hatası:", pdfErr);
     }
 
-    // 6) Önceki analizler tablosuna ekle (beyanname_analysis)
+    await supabase.from("analysis_queue").update({ progress: 100 }).eq("id", queueId);
+
     await supabase.from("beyanname_analysis").insert({
       user_id: user.id,
       analysis_response: gptAnswer,
       pdf_url: pdfUrl,
     });
 
-    // 7) Kuyruk kaydını sil (başarılı analiz artık kuyrukta kalmasın)
-    await supabase.from("analysis_queue").delete().eq("id", queueId);
+    await supabase.from("analysis_queue").update({ status: "completed" }).eq("id", queueId);
 
     return NextResponse.json({ success: true, pdf_url: pdfUrl });
   } catch (err) {
     console.error("Analiz Hatası:", err);
+    await supabase.from("analysis_queue").update({
+      status: "error",
+      result: err.message,
+    }).eq("id", queueId);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-/**
- * Belirtilen maxWidth karakterinde satırlara bölmek için basit bir wrapText fonksiyonu.
- */
 function wrapText(text, maxWidth) {
   const words = text.split(/\s+/);
   let lines = [];
