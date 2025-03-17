@@ -16,6 +16,7 @@ export default function AnalizPage() {
   const [loading, setLoading] = useState(false);
   const [loadingPull, setLoadingPull] = useState({});
   const [pullStatus, setPullStatus] = useState({});
+  const [countdown, setCountdown] = useState({});
 
   useEffect(() => {
     fetchBeyanname();
@@ -115,7 +116,6 @@ export default function AnalizPage() {
 
   async function handlePull(queueId) {
     setError("");
-    setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
     setLoadingPull((prev) => ({ ...prev, [queueId]: true }));
 
     try {
@@ -129,8 +129,26 @@ export default function AnalizPage() {
       const startJson = await startRes.json();
       if (!startRes.ok) throw new Error(startJson.error || "Analiz başlatılamadı.");
 
-      setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
+      // Tabloyu hemen güncelle
       await fetchQueue();
+
+      // Geri sayım ile mesaj göster
+      setPullStatus((prev) => ({
+        ...prev,
+        [queueId]: "Analiz başlatıldı, durumu kontrol etmek için bekleyin",
+      }));
+      setCountdown((prev) => ({ ...prev, [queueId]: 10 }));
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          const newCount = prev[queueId] - 1;
+          if (newCount <= 0) {
+            clearInterval(interval);
+            setPullStatus((prevStatus) => ({ ...prevStatus, [queueId]: "" }));
+            return { ...prev, [queueId]: 0 };
+          }
+          return { ...prev, [queueId]: newCount };
+        });
+      }, 1000);
     } catch (err) {
       setError(err.message);
       setPullStatus((prev) => ({ ...prev, [queueId]: "" }));
@@ -156,15 +174,27 @@ export default function AnalizPage() {
       if (!res.ok) throw new Error(json.error || "Durum kontrolü başarısız.");
 
       if (json.status === "completed") {
-        setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor tamam" }));
-        await fetchQueue();
-        await fetchPreviousAnalyses();
+        setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor tamam, çekiliyor" }));
+        await fetchQueue(); // Kuyruğu güncelle
+        await fetchPreviousAnalyses(); // Geçmiş analizleri güncelle
         setTimeout(() => setPullStatus((prev) => ({ ...prev, [queueId]: "" })), 3000);
       } else if (json.status === "error") {
         setError("Analiz sırasında hata oluştu.");
         setPullStatus((prev) => ({ ...prev, [queueId]: "" }));
       } else {
-        setPullStatus((prev) => ({ ...prev, [queueId]: "Rapor oluşturuluyor" }));
+        setPullStatus((prev) => ({ ...prev, [queueId]: "Analiz devam ediyor, lütfen tekrar kontrol edin" }));
+        setCountdown((prev) => ({ ...prev, [queueId]: 10 }));
+        const interval = setInterval(() => {
+          setCountdown((prev) => {
+            const newCount = prev[queueId] - 1;
+            if (newCount <= 0) {
+              clearInterval(interval);
+              setPullStatus((prevStatus) => ({ ...prevStatus, [queueId]: "" }));
+              return { ...prev, [queueId]: 0 };
+            }
+            return { ...prev, [queueId]: newCount };
+          });
+        }, 1000);
       }
     } catch (err) {
       setError(err.message);
@@ -266,9 +296,10 @@ export default function AnalizPage() {
         pullStatus[queueId] ? (
           <Alert
             key={queueId}
-            severity={pullStatus[queueId] === "Rapor tamam" ? "success" : "warning"}
+            severity={pullStatus[queueId].includes("Rapor tamam") ? "success" : "warning"}
           >
-            {pullStatus[queueId]}
+            {pullStatus[queueId]}{" "}
+            {countdown[queueId] > 0 && `(${countdown[queueId]})`}
             {loadingPull[queueId] && <CircularProgress size={16} sx={{ ml: 1 }} />}
           </Alert>
         ) : null
