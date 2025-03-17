@@ -1,9 +1,0 @@
-{
-    "crons": [
-      {
-        "path": "/api/run-background",
-        "schedule": "*/5 * * * *"
-      }
-    ]
-  }
-  

@@ -11,20 +11,18 @@ export default function AnalizPage() {
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [queueId, setQueueId] = useState(null);
-  const [jobStatus, setJobStatus] = useState(null); // Kuyruğa eklenen işin durumu
+  const [jobStatus, setJobStatus] = useState(null);
   const [pollingId, setPollingId] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // "Önceki analizler" tablosu
   const [analysisRows, setAnalysisRows] = useState([]);
 
-  // 1) Beyanname dosyalarını çek
+  // Beyanname dosyalarını çek
   useEffect(() => {
     async function fetchFiles() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        setError("Kullanıcı oturumu bulunamadı. Lütfen giriş yapın.");
+        setError("Please log in.");
         return;
       }
       const { data, error } = await supabase
@@ -33,25 +31,17 @@ export default function AnalizPage() {
         .eq("user_id", user.id)
         .order("donem_yil", { ascending: false })
         .order("donem_ay", { ascending: false });
-
-      if (error) {
-        setError(`Beyannameler yüklenemedi: ${error.message}`);
-      } else {
-        setFiles(data || []);
-      }
+      if (error) setError(`Failed to fetch files: ${error.message}`);
+      else setFiles(data || []);
     }
-
-    // 2) "Önceki analizler" (beyanname_analysis tablosu)
     async function fetchPreviousAnalyses() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) return;
-
       const res = await fetch("/api/previous-analyses", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const result = await res.json();
       if (res.ok) {
-        // data => result.analyses
         const rows = (result.analyses || []).map((item) => ({
           id: item.id,
           created_at: item.created_at,
@@ -59,18 +49,16 @@ export default function AnalizPage() {
         }));
         setAnalysisRows(rows);
       } else {
-        setError(`Önceki analizler yüklenemedi: ${result.error}`);
+        setError(`Failed to fetch previous analyses: ${result.error}`);
       }
     }
-
     fetchFiles();
     fetchPreviousAnalyses();
   }, []);
 
-  // 3) Kuyruğa ekle
   async function handleAnalyze() {
     if (selectedFiles.length === 0) {
-      setError("Lütfen en az bir beyanname seçiniz.");
+      setError("Select at least one file.");
       return;
     }
     setError("");
@@ -79,14 +67,12 @@ export default function AnalizPage() {
 
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
-      setError("Oturum alınamadı. Lütfen tekrar giriş yapın.");
+      setError("Session not found. Please log in again.");
       return;
     }
 
     setLoading(true);
-
     try {
-      // a) Seçili dosyaları JSON'a çeviriyoruz
       const combinedData = selectedFiles.map((file) => ({
         firma_adi: file.firma_adi,
         vergi_no: file.vergi_no,
@@ -95,71 +81,58 @@ export default function AnalizPage() {
         json_data: file.json_data,
       }));
 
-      // b) /api/queue-analyze endpointine POST
       const res = await fetch("/api/queue-analyze", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ data: combinedData }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "Kuyruğa ekleme başarısız oldu.");
-      }
-
-      // c) queueId'yi sakla
+      if (!res.ok) throw new Error(json.error || "Failed to add to queue.");
       setQueueId(json.queue_id);
       setJobStatus({ status: "pending" });
-
-      // d) Her 3 sn'de bir durum sorgulama
       const interval = setInterval(async () => {
         await checkStatus(json.queue_id, session.access_token);
       }, 3000);
       setPollingId(interval);
     } catch (err) {
-      setError(`Kuyruğa eklenemedi: ${err.message}`);
+      setError(`Failed to enqueue: ${err.message}`);
     } finally {
       setLoading(false);
     }
   }
 
-  // Durum sorgulama fonksiyonu
   async function checkStatus(qId, token) {
     try {
-      const url = `/api/analysis-status?queue_id=${qId}`;
-      const res = await fetch(url, {
+      const res = await fetch(`/api/analysis-status?queue_id=${qId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-
       if (res.ok && json.queue) {
         setJobStatus(json.queue);
-
         if (json.queue.status === "done" || json.queue.status === "error") {
-          // İşlem bitmiş, interval'ı durdur
           clearInterval(pollingId);
           setPollingId(null);
         }
       } else {
-        setError(json.error || "Durum sorgulama hatası.");
+        setError(json.error || "Error fetching status.");
       }
     } catch (err) {
-      setError(`Durum sorgulanamadı: ${err.message}`);
+      setError(`Status check failed: ${err.message}`);
     }
   }
 
-  // 4) DataGrid kolonları
   const oldAnalysisColumns = [
     {
       field: "id",
-      headerName: "Analiz ID",
+      headerName: "Analysis ID",
       width: 120,
     },
     {
       field: "created_at",
-      headerName: "Tarih",
+      headerName: "Date",
       flex: 1,
       renderCell: (params) => {
         const dateStr = new Date(params.value).toLocaleString("tr-TR");
@@ -171,10 +144,10 @@ export default function AnalizPage() {
       headerName: "PDF",
       width: 120,
       renderCell: (params) => {
-        if (!params.value) return "Yok";
+        if (!params.value) return "None";
         return (
           <a href={params.value} target="_blank" rel="noopener noreferrer">
-            İndir
+            Download
           </a>
         );
       },
@@ -183,9 +156,8 @@ export default function AnalizPage() {
 
   return (
     <Box className="analiz-container">
-      {/* Üst Header */}
       <Box className="analiz-header">
-        <Typography variant="h4">📂 Beyanname Analizi (Asenkron)</Typography>
+        <Typography variant="h4">📂 Beyanname Analysis (Async)</Typography>
         <Link href="/dashboard" className="nav-link">
           Dashboard
         </Link>
@@ -193,16 +165,15 @@ export default function AnalizPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {/* Dosyalar tablosu */}
       <div className="table-wrapper">
         <DataGrid
           className="data-table"
-          rows={files.map((file) => ({ ...file, id: file.id }))} 
+          rows={files.map((file) => ({ ...file, id: file.id }))}
           columns={[
-            { field: "firma_adi", headerName: "Firma Adı", flex: 1 },
+            { field: "firma_adi", headerName: "Firma", flex: 1 },
             { field: "vergi_no", headerName: "Vergi No", flex: 1 },
-            { field: "donem_yil", headerName: "Yıl", width: 100 },
-            { field: "donem_ay", headerName: "Ay", width: 100 },
+            { field: "donem_yil", headerName: "Year", width: 100 },
+            { field: "donem_ay", headerName: "Month", width: 100 },
           ]}
           checkboxSelection
           disableRowSelectionOnClick
@@ -219,47 +190,41 @@ export default function AnalizPage() {
         onClick={handleAnalyze}
         disabled={loading || selectedFiles.length === 0}
       >
-        {loading ? <CircularProgress size={24} /> : `Analizi Kuyruğa Ekle (${selectedFiles.length})`}
+        {loading ? <CircularProgress size={24} /> : `Enqueue Analysis (${selectedFiles.length})`}
       </Button>
 
-      {/* Kuyruk ID ve Durum Görüntüleme */}
       {queueId && (
         <Box mt={3} className="analiz-result">
-          <Typography variant="h6">Kuyruk ID: {queueId}</Typography>
+          <Typography variant="h6">Queue ID: {queueId}</Typography>
           {jobStatus && (
             <>
               <Typography>
-                Durum: <strong>{jobStatus.status}</strong>
+                Status: <strong>{jobStatus.status}</strong>
               </Typography>
-
               {jobStatus.status === "done" && (
                 <>
-                  <Typography>GPT Yanıtı: {jobStatus.result}</Typography>
+                  <Typography>GPT Response: {jobStatus.result}</Typography>
                   {jobStatus.pdf_url && (
                     <p>
                       <a href={jobStatus.pdf_url} target="_blank" rel="noopener noreferrer">
-                        PDF İndir
+                        Download PDF
                       </a>
                     </p>
                   )}
                 </>
               )}
-
               {jobStatus.status === "error" && (
-                <Typography color="error">
-                  Hata Mesajı: {jobStatus.result}
-                </Typography>
+                <Typography color="error">Error: {jobStatus.result}</Typography>
               )}
             </>
           )}
         </Box>
       )}
 
-      {/* Önceki (eski) analizler => beyanname_analysis tablosu */}
       <Box className="previous-analyses" mt={4}>
-        <Typography variant="h5">Önceki Analizler</Typography>
+        <Typography variant="h5">Previous Analyses</Typography>
         {analysisRows.length === 0 ? (
-          <Typography>Henüz herhangi bir analiz kaydı yok.</Typography>
+          <Typography>No previous analyses found.</Typography>
         ) : (
           <div style={{ height: 300 }}>
             <DataGrid
