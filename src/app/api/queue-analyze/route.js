@@ -12,19 +12,46 @@ async function processAnalysisAsync(uniqueId, userId, beyannameIds, jsonData, au
   });
 
   try {
+    // Daha detaylı prompt oluşturma
     const prompt = `
 Şirketin mali beyannamesi üzerinden kapsamlı bir **finansal analiz** gerçekleştir. Analizi **Markdown** formatında detaylı ve açıklayıcı bir şekilde oluştur.
 
-- **Başlıkları** '#' ile, **alt başlıkları** '##' ile belirt.
+- **Başlıkları** '#' ile, **alt başlıkları** '##' ile belirt ama ### kullanamazsın en fazla alt başlık olabilir.
 - **Rapor içeriği:**
-  - **Genel Değerlendirme:** Şirketin mevcut finansal durumu, büyüme eğilimleri, likidite durumu ve borçluluk oranları.
-  - **KDV Matrahı & Tevkifatlı İşlemler:** Vergi yükümlülükleri, KDV matrahı, tevkifat uygulanan işlemler ve bunların finansal tabloya etkileri.
-  - **Nakit Akışı & Karlılık:** Şirketin gelir-gider dengesi, kâr marjları, operasyonel kârlılık durumu.
-  - **Geleceğe Yönelik Riskler ve Fırsatlar:** Finansal göstergelere göre şirketin karşılaşabileceği riskler ve gelişim fırsatları.
-  - **Öneriler:** Finansal iyileştirme için alınabilecek aksiyonlar ve vergi avantajları.
+  - **Yönetici Özeti:** Tüm finansal tabloların kısa bir özeti ve temel bulguların vurgulandığı genel değerlendirme.
+  - **Finansal Durum Analizi:** 
+    - Bilanço analizi (varlık ve yükümlülük yapısı)
+    - Sermaye yapısı ve öz kaynak değerlendirmesi
+    - Likidite oranları (Cari oran, asit-test oranı)
+    - Borçluluk oranları (Borç/Özkaynak, Finansal kaldıraç)
+  - **KDV Matrahı & Tevkifatlı İşlemler:** 
+    - Vergi yükümlülükleri detayları
+    - KDV matrahı ve hesaplama yöntemi
+    - Tevkifat uygulanan işlemlerin detaylı analizi
+    - KDV İade durumu ve önerileri
+  - **Nakit Akışı & Karlılık:** 
+    - Gelir-gider dengesi ve net nakit akışı
+    - Brüt kâr, faaliyet kârı ve net kâr marjları
+    - FAVÖK analizi ve karşılaştırmalı değerlendirme
+    - Dönemsel nakit akışı değişimleri
+  - **Oran Analizleri:**
+    - Faaliyet oranları (Alacak devir hızı, stok devir hızı)
+    - Karlılık oranları (ROA, ROE, Net kar marjı)
+    - Verimlilik oranları
+  - **Trend Analizi:** Son 3 dönem karşılaştırması ve büyüme/küçülme oranları
+  - **Sektörel Karşılaştırma:** Şirketin sektör ortalamaları ile karşılaştırılması
+  - **Geleceğe Yönelik Riskler ve Fırsatlar:** 
+    - Mevcut finansal yapının sürdürülebilirliği
+    - Potansiyel risk faktörleri ve etki analizi
+    - Büyüme potansiyeli ve fırsat alanları
+  - **Öneriler:** 
+    - Finansal yapının iyileştirilmesi için stratejik öneriler
+    - Vergi optimizasyonu ve avantajları için tavsiyeler
+    - Maliyet kontrolü ve verimlilik artırma yöntemleri
+    - Nakit akışı yönetimi için öneriler
 
-**Eksik veriler için mantıklı tahminlerde bulunarak analizi tamamla.**  
-Eğer birden fazla dosya ve ay varsa irketin mevcut ayı önceki aylarla kıyaslayan bir trend analizi de ekle.
+**Eksik veriler için mantıklı tahminlerde bulunarak analizi tamamla ve varsa anomali tespit edilen alanlara özel vurgu yap.**  
+Eğer birden fazla dönem verisi varsa, şirketin finansal performansını karşılaştırmalı trend analizi ile değerlendir ve görselleştirmeler için kullanılabilecek veri noktalarını belirt.
 
 İşte analiz edilmesi gereken JSON verileri:
 
@@ -33,10 +60,13 @@ ${JSON.stringify(jsonData, null, 2)}
 \`\`\`
 `;
 
+    // Daha gelişmiş model ve daha yüksek token limiti kullanma
     const claudeResponse = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
-      max_tokens: 4000,
+      model: "claude-3-7-sonnet-20250219", // Daha gelişmiş model
+      max_tokens: 12000, // Daha uzun çıktı
+      temperature: 0.2, // Daha tutarlı sonuçlar için
       messages: [{ role: "user", content: prompt }],
+      system: "Sen deneyimli bir finansal analist ve vergi danışmanısın. Mali beyanname verilerini derinlemesine analiz ederek, şirketlerin finansal durumları hakkında profesyonel içgörüler ve stratejik öneriler sunarsın. Analizlerinde açık, anlaşılır bir dil kullan ve karmaşık finansal kavramları basitleştir. Vergilendirme konularında güncel mevzuata uygun değerlendirmeler yap."
     });
 
     const analysisText = claudeResponse.content?.[0]?.text;
