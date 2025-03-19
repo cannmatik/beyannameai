@@ -14,6 +14,12 @@ async function processAnalysisAsync(uniqueId, userId, beyannameIds, jsonData, au
   });
 
   try {
+    // İlk olarak status'u "processing" olarak güncelle
+    await supabase
+      .from("analysis_queue")
+      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .eq("unique_id", uniqueId);
+
     const systemInstructions = `
 Sen deneyimli bir finansal analist ve vergi danışmanısın. 
 Mali beyanname verilerini derinlemesine analiz ederek, şirketlerin finansal durumları hakkında 
@@ -36,43 +42,43 @@ Aşağıdaki JSON verilerini analiz et ve raporu şu bölümlerle yapılandır:
 6. **Risk ve Öneriler:** Vergi optimizasyonu, işlem yoğunluğu ve sektörel çeşitlendirme önerileri.
 7. **Yasal Uyumluluk:** Mevzuata uygunluk değerlendirmesi.
 8. **Sonuç ve Değerlendirme:** Genel bir özet ve stratejik değerlendirme.
-0. **Sonraki Ayın Projeksiyonu"" Eğer farklı tarihlere sahip birden fazla belge yüklenmişse bunları inceleyip sonraki aylar için muhtemel senaryolar ve neye ağırlık verilmesi gerektiğini içerir.
+0. **Sonraki Ayın Projeksiyonu:** Eğer farklı tarihlere sahip birden fazla belge yüklenmişse bunları inceleyip sonraki aylar için muhtemel senaryolar ve neye ağırlık verilmesi gerektiğini içerir.
 JSON verisi:
 \`\`\`json
 ${JSON.stringify(jsonData, null, 2)}
 \`\`\`
 
 Raporu mümkün olduğunca detaylı ve profesyonel bir şekilde hazırla. Her bölümde ilgili verilere dayanarak yorumlar ve öneriler sun.
-Tablo oluşturmaktan kaçın çıktı pdf olacak ona göre sadee metin yaz 
+Tablo oluşturmaktan kaçın çıktı pdf olacak ona göre sadece metin yaz 
     `;
 
-    // Claude Messages API isteği
-    const claudeResponse = await anthropic.messages.create({
-      model: "claude-3-7-sonnet-20250219", // İlk attığın model
-      max_tokens: 8192, // Modelin maksimum token sınırı
-      temperature: 0.2,
-      system: systemInstructions,
-      messages: [
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
-    });
+    // Claude API isteği için timeout ekleme
+    const claudeResponse = await Promise.race([
+      anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 8192,
+        temperature: 0.2,
+        system: systemInstructions,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Claude API isteği zaman aşımına uğradı")), 120000)
+      )
+    ]);
 
     const analysisText = claudeResponse.content[0]?.text?.trim();
     if (!analysisText) {
       throw new Error("Claude API'den geçerli analiz alınamadı veya yanıt boş.");
     }
 
-    // 1) Kuyruk durumunu güncelle
+    // Başarılı tamamlanma durumunda kuyruk durumunu güncelle
     const { error: queueErr } = await supabase
       .from("analysis_queue")
       .update({ status: "completed", updated_at: new Date().toISOString() })
       .eq("unique_id", uniqueId);
     if (queueErr) throw new Error(`Kuyruk güncelleme hatası: ${queueErr.message}`);
 
-    // 2) Analizi kaydet
+    // Analizi kaydet
     const { error: insertErr } = await supabase
       .from("beyanname_analysis")
       .insert({
@@ -87,6 +93,7 @@ Tablo oluşturmaktan kaçın çıktı pdf olacak ona göre sadee metin yaz
   } catch (error) {
     console.error("Analiz hatası:", error);
 
+    // Hata durumunda hem kuyruk durumunu güncelle hem de log ekle
     await supabase
       .from("analysis_queue")
       .update({ status: "failed", updated_at: new Date().toISOString() })
@@ -98,6 +105,7 @@ Tablo oluşturmaktan kaçın çıktı pdf olacak ona göre sadee metin yaz
         unique_id: uniqueId,
         error_message: error.message,
         stack: error.stack,
+        created_at: new Date().toISOString(),
       });
 
     throw error;
@@ -116,10 +124,8 @@ export async function POST(req) {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return new Response(JSON.stringify({ error: "Geçersiz oturum" }), {
       status: 401,
@@ -136,6 +142,7 @@ export async function POST(req) {
       });
     }
 
+    // Kuyruğa eklerken created_at ve updated_at ekle
     const { error: queueError } = await supabase
       .from("analysis_queue")
       .insert({
@@ -143,10 +150,12 @@ export async function POST(req) {
         user_id,
         beyanname_ids,
         status: "pending",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        json_data: json_data // JSON verisini de saklayalım ki retry için kullanılabilsin
       });
     if (queueError) throw new Error(`Kuyruk ekleme hatası: ${queueError.message}`);
 
-    // authHeader'ı doğru şekilde aktar
     processAnalysisAsync(unique_id, user_id, beyanname_ids, json_data, authHeader).catch(
       (err) => console.error("Asenkron analiz hatası:", err)
     );
@@ -155,6 +164,7 @@ export async function POST(req) {
       JSON.stringify({
         success: true,
         message: "Analiz kuyruğa eklendi ve işlem başladı",
+        unique_id: unique_id
       }),
       {
         status: 200,

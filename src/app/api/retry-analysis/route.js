@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { processAnalysisAsync } from "../queue-analyze/route"; // Adjust the path as needed
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -26,50 +27,42 @@ export async function GET(req) {
   });
 
   try {
+    // Reset the status to pending
+    const { error } = await supabase
+      .from("analysis_queue")
+      .update({ status: "pending", updated_at: new Date().toISOString() })
+      .eq("unique_id", unique_id);
+
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Get the data needed for re-analysis
     const { data: queueData, error: queueError } = await supabase
       .from("analysis_queue")
-      .select("status, created_at, updated_at")
+      .select("user_id, beyanname_ids, json_data")
       .eq("unique_id", unique_id)
       .single();
 
     if (queueError || !queueData) {
-      return new Response(
-        JSON.stringify({ error: queueError?.message || "Kayıt bulunamadı" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    let logs = null;
-    if (queueData.status === "failed") {
-      const { data: logData } = await supabase
-        .from("analysis_logs")
-        .select("*")
-        .eq("unique_id", unique_id)
-        .maybeSingle();
-      logs = logData || null;
-    }
-
-    const processingTime = queueData.status === "processing" 
-      ? new Date() - new Date(queueData.updated_at) 
-      : 0;
-    const isLikelyStuck = processingTime > 300000; // 5 minutes
-
-    return new Response(
-      JSON.stringify({
-        status: queueData.status,
-        completed: queueData.status === "completed",
-        processingTime: processingTime > 0 ? Math.floor(processingTime / 1000) : 0,
-        isLikelyStuck,
-        logs,
-      }),
-      {
-        status: 200,
+      return new Response(JSON.stringify({ error: queueError?.message || "Kayıt bulunamadı" }), {
+        status: 404,
         headers: { "Content-Type": "application/json" },
-      }
+      });
+    }
+
+    // Restart the analysis process
+    processAnalysisAsync(unique_id, queueData.user_id, queueData.beyanname_ids, queueData.json_data, authHeader).catch(
+      (err) => console.error("Asenkron analiz hatası:", err)
     );
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
