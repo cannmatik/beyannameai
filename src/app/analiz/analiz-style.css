@@ -7,7 +7,6 @@
   font-family: 'Segoe UI', sans-serif;
 }
 
-/* En üst header row */
 .analiz-header {
   display: flex;
   align-items: center;
@@ -16,7 +15,6 @@
   font-size: 1.5rem;
 }
 
-/* nav-link: Dashboard butonu (link şeklinde) */
 .nav-link {
   background-color: #555;
   color: #fff;
@@ -115,22 +113,24 @@
   color: #f2f2f2;
 }
 
-/* DataGrid tarzı */
 .data-table {
   color: #f2f2f2 !important;
 }
 
-/* Tablonun sütun başlıkları (kolon header) => beyaz zemin, siyah, kalın yazı */
 .data-table .MuiDataGrid-columnHeaders {
   background-color: #fff !important;
   color: #000 !important;
   font-weight: 700 !important;
 }
 
-/* Satır arkaplan, hover efekti */
 .data-table .MuiDataGrid-row {
   background-color: #222 !important;
 }
 .data-table .MuiDataGrid-row:hover {
   background-color: #333 !important;
+}
+
+/* Tamamlandı butonunun hizalanması için */
+.data-table .MuiButton-root {
+  margin: 0.5rem 0; /* Dikey boşluk */
 }

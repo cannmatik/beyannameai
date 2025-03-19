@@ -1,87 +1,79 @@
-// app/api/queue-analyze/route.js
 import { createClient } from "@supabase/supabase-js";
 import { Anthropic } from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+const anthropic = new Anthropic({
+  apiKey: process.env.CLAUDE_API_KEY,
+});
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-async function processAnalysisAsync(uniqueId, userId, beyannameIds, jsonData, authToken) {
+async function processAnalysisAsync(uniqueId, userId, beyannameIds, jsonData, authHeader) {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authToken } },
+    global: { headers: { Authorization: authHeader } },
   });
 
   try {
-    // Daha detaylı prompt oluşturma
-    const prompt = `
-Şirketin mali beyannamesi üzerinden kapsamlı bir **finansal analiz** gerçekleştir. Analizi **Markdown** formatında detaylı ve açıklayıcı bir şekilde oluştur.
+    const systemInstructions = `
+Sen deneyimli bir finansal analist ve vergi danışmanısın. 
+Mali beyanname verilerini derinlemesine analiz ederek, şirketlerin finansal durumları hakkında 
+profesyonel içgörüler ve stratejik öneriler sunarsın. Analizlerinde açık, anlaşılır bir dil kullan 
+ve karmaşık finansal kavramları basitleştir. Vergilendirme konularında güncel mevzuata uygun 
+değerlendirmeler yap.
+    `;
 
-- **Başlıkları** '#' ile, **alt başlıkları** '##' ile belirt ama ### kullanamazsın en fazla alt başlık olabilir.
-- **Rapor içeriği:**
-  - **Yönetici Özeti:** Tüm finansal tabloların kısa bir özeti ve temel bulguların vurgulandığı genel değerlendirme.
-  - **Finansal Durum Analizi:** 
-    - Bilanço analizi (varlık ve yükümlülük yapısı)
-    - Sermaye yapısı ve öz kaynak değerlendirmesi
-    - Likidite oranları (Cari oran, asit-test oranı)
-    - Borçluluk oranları (Borç/Özkaynak, Finansal kaldıraç)
-  - **KDV Matrahı & Tevkifatlı İşlemler:** 
-    - Vergi yükümlülükleri detayları
-    - KDV matrahı ve hesaplama yöntemi
-    - Tevkifat uygulanan işlemlerin detaylı analizi
-    - KDV İade durumu ve önerileri
-  - **Nakit Akışı & Karlılık:** 
-    - Gelir-gider dengesi ve net nakit akışı
-    - Brüt kâr, faaliyet kârı ve net kâr marjları
-    - FAVÖK analizi ve karşılaştırmalı değerlendirme
-    - Dönemsel nakit akışı değişimleri
-  - **Oran Analizleri:**
-    - Faaliyet oranları (Alacak devir hızı, stok devir hızı)
-    - Karlılık oranları (ROA, ROE, Net kar marjı)
-    - Verimlilik oranları
-  - **Trend Analizi:** Son 3 dönem karşılaştırması ve büyüme/küçülme oranları
-  - **Sektörel Karşılaştırma:** Şirketin sektör ortalamaları ile karşılaştırılması
-  - **Geleceğe Yönelik Riskler ve Fırsatlar:** 
-    - Mevcut finansal yapının sürdürülebilirliği
-    - Potansiyel risk faktörleri ve etki analizi
-    - Büyüme potansiyeli ve fırsat alanları
-  - **Öneriler:** 
-    - Finansal yapının iyileştirilmesi için stratejik öneriler
-    - Vergi optimizasyonu ve avantajları için tavsiyeler
-    - Maliyet kontrolü ve verimlilik artırma yöntemleri
-    - Nakit akışı yönetimi için öneriler
+    const userPrompt = `
+Şirketin mali beyannamesi üzerinden kapsamlı bir **finansal analiz raporu** oluştur. 
+Raporu **Markdown** formatında, aşağıdaki yapıya uygun şekilde detaylı ve açıklayıcı bir şekilde hazırla. 
+Başlıkları '#' ile, alt başlıkları '##' ile belirt .
+Aşağıdaki JSON verilerini analiz et ve raporu şu bölümlerle yapılandır:
 
-**Eksik veriler için mantıklı tahminlerde bulunarak analizi tamamla ve varsa anomali tespit edilen alanlara özel vurgu yap.**  
-Eğer birden fazla dönem verisi varsa, şirketin finansal performansını karşılaştırmalı trend analizi ile değerlendir ve görselleştirmeler için kullanılabilecek veri noktalarını belirt.
-
-İşte analiz edilmesi gereken JSON verileri:
-
+1. **Şirket Bilgileri:** Şirket adı, vergi numarası, iletişim bilgileri, dönem gibi temel bilgileri içer.
+2. **Finansal Özet:** Toplam işlem tutarı, toplam damga vergisi, ortalama vergi oranı gibi özet bilgiler.
+3. **İşlem Analizi:** İşlem sayısı, belge türü dağılımı gibi detaylı analizler.
+4. **Önemli İşlemler:** En yüksek tutarlı işlemler ve damga vergisi ödemeleri.
+5. **Sektörel Dağılım:** İşlemlerin sektörlere göre dağılımı (örneğin, teknoloji, gayrimenkul vb.).
+6. **Risk ve Öneriler:** Vergi optimizasyonu, işlem yoğunluğu ve sektörel çeşitlendirme önerileri.
+7. **Yasal Uyumluluk:** Mevzuata uygunluk değerlendirmesi.
+8. **Sonuç ve Değerlendirme:** Genel bir özet ve stratejik değerlendirme.
+0. **Sonraki Ayın Projeksiyonu"" Eğer farklı tarihlere sahip birden fazla belge yüklenmişse bunları inceleyip sonraki aylar için muhtemel senaryolar ve neye ağırlık verilmesi gerektiğini içerir.
+JSON verisi:
 \`\`\`json
 ${JSON.stringify(jsonData, null, 2)}
 \`\`\`
-`;
 
-    // Daha gelişmiş model ve daha yüksek token limiti kullanma
+Raporu mümkün olduğunca detaylı ve profesyonel bir şekilde hazırla. Her bölümde ilgili verilere dayanarak yorumlar ve öneriler sun.
+Tablo oluşturmaktan kaçın çıktı pdf olacak ona göre sadee metin yaz 
+    `;
+
+    // Claude Messages API isteği
     const claudeResponse = await anthropic.messages.create({
-      model: "claude-3-7-sonnet-20250219", // Daha gelişmiş model
-      max_tokens: 12000, // Daha uzun çıktı
-      temperature: 0.2, // Daha tutarlı sonuçlar için
-      messages: [{ role: "user", content: prompt }],
-      system: "Sen deneyimli bir finansal analist ve vergi danışmanısın. Mali beyanname verilerini derinlemesine analiz ederek, şirketlerin finansal durumları hakkında profesyonel içgörüler ve stratejik öneriler sunarsın. Analizlerinde açık, anlaşılır bir dil kullan ve karmaşık finansal kavramları basitleştir. Vergilendirme konularında güncel mevzuata uygun değerlendirmeler yap."
+      model: "claude-3-7-sonnet-20250219", // İlk attığın model
+      max_tokens: 8192, // Modelin maksimum token sınırı
+      temperature: 0.2,
+      system: systemInstructions,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
     });
 
-    const analysisText = claudeResponse.content?.[0]?.text;
-    if (!analysisText) throw new Error("Claude API'den geçerli analiz alınamadı.");
+    const analysisText = claudeResponse.content[0]?.text?.trim();
+    if (!analysisText) {
+      throw new Error("Claude API'den geçerli analiz alınamadı veya yanıt boş.");
+    }
 
-    // Kuyruk durumunu güncelle...
-
-    const { error: updateError } = await supabase
+    // 1) Kuyruk durumunu güncelle
+    const { error: queueErr } = await supabase
       .from("analysis_queue")
       .update({ status: "completed", updated_at: new Date().toISOString() })
       .eq("unique_id", uniqueId);
-    if (updateError) throw new Error(`Kuyruk güncelleme hatası: ${updateError.message}`);
+    if (queueErr) throw new Error(`Kuyruk güncelleme hatası: ${queueErr.message}`);
 
-    // Analizi kaydet
-    const { error: insertError } = await supabase
+    // 2) Analizi kaydet
+    const { error: insertErr } = await supabase
       .from("beyanname_analysis")
       .insert({
         unique_id: uniqueId,
@@ -91,13 +83,24 @@ ${JSON.stringify(jsonData, null, 2)}
         pdf_url: "",
         created_at: new Date().toISOString(),
       });
-    if (insertError) throw new Error(`Analiz ekleme hatası: ${insertError.message}`);
+    if (insertErr) throw new Error(`Analiz ekleme hatası: ${insertErr.message}`);
   } catch (error) {
     console.error("Analiz hatası:", error);
+
     await supabase
       .from("analysis_queue")
       .update({ status: "failed", updated_at: new Date().toISOString() })
       .eq("unique_id", uniqueId);
+
+    await supabase
+      .from("analysis_logs")
+      .insert({
+        unique_id: uniqueId,
+        error_message: error.message,
+        stack: error.stack,
+      });
+
+    throw error;
   }
 }
 
@@ -113,7 +116,10 @@ export async function POST(req) {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     return new Response(JSON.stringify({ error: "Geçersiz oturum" }), {
       status: 401,
@@ -130,23 +136,26 @@ export async function POST(req) {
       });
     }
 
-    // Önce analysis_queue'ya ekle
     const { error: queueError } = await supabase
       .from("analysis_queue")
       .insert({
-        unique_id: unique_id,
-        user_id: user_id,
-        beyanname_ids: beyanname_ids,
+        unique_id,
+        user_id,
+        beyanname_ids,
         status: "pending",
       });
     if (queueError) throw new Error(`Kuyruk ekleme hatası: ${queueError.message}`);
 
-    // Analizi asenkron olarak başlat (beklemeden)
-    processAnalysisAsync(unique_id, user_id, beyanname_ids, json_data, authHeader);
+    // authHeader'ı doğru şekilde aktar
+    processAnalysisAsync(unique_id, user_id, beyanname_ids, json_data, authHeader).catch(
+      (err) => console.error("Asenkron analiz hatası:", err)
+    );
 
-    // Hemen yanıt dön, analiz arka planda devam etsin
     return new Response(
-      JSON.stringify({ success: true, message: "Analiz kuyruğa eklendi ve işlem başladı" }),
+      JSON.stringify({
+        success: true,
+        message: "Analiz kuyruğa eklendi ve işlem başladı",
+      }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
