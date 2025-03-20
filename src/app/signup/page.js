@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import "./style.css";
+import "@/app/styles/global-style.css";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,32 +18,25 @@ export default function SignupPage() {
     setError("");
     setInfo("");
 
-    // Kullanıcı kaydı (email & password)
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: "http://localhost:3000/login",
-        // E-posta onayı sonrası nereye yönlensin
       },
     });
 
     if (error) {
       setError(error.message);
     } else {
-      // Kayıt başarılı => E-posta doğrulaması maili gönderilmiş olur
       setInfo("Kayıt başarılı! Lütfen e-postanızı kontrol edin.");
-      // Yönlendirme: isterseniz router.push("/login") diyebilirsiniz
     }
   };
 
   return (
     <div className="auth-page">
-      {/* Üst bar */}
       <header className="auth-header">
-        <Link href="/" className="auth-home-button">
-          Anasayfa
-        </Link>
+        <Link href="/" className="auth-home-button">Ana Sayfa</Link>
       </header>
 
       <main className="auth-main">

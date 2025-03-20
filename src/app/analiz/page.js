@@ -1,123 +1,121 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { DataGrid } from "@mui/x-data-grid";
-import {
-  Button,
-  Typography,
-  Box,
-  CircularProgress,
-  Snackbar,
-  Alert as MuiAlert,
-} from "@mui/material";
-import Link from "next/link";
+import { Button, Typography, Box, CircularProgress, Snackbar, Alert } from "@mui/material";
 import { v4 as uuidv4 } from "uuid";
+import Link from "next/link"; 
 import "./analiz-style.css";
+
+/* MUI Icons */
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import ErrorIcon from "@mui/icons-material/Error";
 
 export default function AnalizPage() {
   const [files, setFiles] = useState([]);
+  const [combinedItems, setCombinedItems] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [queueItems, setQueueItems] = useState([]);
-  const [analysisRows, setAnalysisRows] = useState([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-  const intervalRef = useRef(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  const analyzeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/queue-analyze`;
+  const checkStatusUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-status`;
+  const generatePdfUrl = "/api/generate-pdf";
 
   useEffect(() => {
     fetchAllData();
-
-    intervalRef.current = setInterval(() => {
-      fetchAllData();
-    }, 30000);
-
-    return () => {
-      clearInterval(intervalRef.current);
-    };
+    const interval = setInterval(fetchAllData, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAllData = async () => {
-    try {
-      await Promise.all([
-        fetchBeyanname(),
-        fetchQueue(),
-        fetchPreviousAnalyses(),
-      ]);
-    } catch (err) {
-      setError(`Veriler çekilirken hata oluştu: ${err.message}`);
-    }
-  };
-
-  const refreshSession = async () => {
     const {
       data: { session },
-      error,
     } = await supabase.auth.getSession();
-    if (error || !session) {
-      setError("Oturum geçersiz veya bulunamadı.");
-      return null;
-    }
-    return session;
-  };
-
-  // Beyanname verilerini çek
-  const fetchBeyanname = async () => {
-    const session = await refreshSession();
     if (!session) return;
-    const { data, error } = await supabase
+
+    // Beyannameleri çek
+    const {
+      data: beyannameData,
+      error: beyannameError,
+    } = await supabase
       .from("beyanname")
       .select("*")
       .eq("user_id", session.user.id)
       .order("donem_yil", { ascending: false })
       .order("donem_ay", { ascending: false });
-    if (error) throw new Error(error.message);
-    setFiles(data || []);
-  };
+    if (beyannameError) console.error("fetchBeyanname error:", beyannameError);
+    setFiles(beyannameData || []);
 
-  // Kuyruk verilerini çek
-  const fetchQueue = async () => {
-    const session = await refreshSession();
-    if (!session) return;
-    const { data, error } = await supabase
+    // Analiz kuyruğunu çek
+    const {
+      data: queueData,
+      error: queueError,
+    } = await supabase
       .from("analysis_queue")
       .select("*")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    setQueueItems(data || []);
-  };
+    if (queueError) {
+      console.error("fetchQueue error:", queueError);
+      setSnackbar({
+        open: true,
+        message: "Analiz kuyruğu çekilemedi.",
+        severity: "error",
+      });
+      return;
+    }
 
-  // Eski analizleri çek
-  const fetchPreviousAnalyses = async () => {
-    const session = await refreshSession();
-    if (!session) return;
-    const { data, error } = await supabase
+    // Tamamlanmış analizleri çek
+    const {
+      data: analysisData,
+      error: analysisError,
+    } = await supabase
       .from("beyanname_analysis")
       .select("*")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (analysisError) console.error("fetchAnalysis error:", analysisError);
 
-    // Boş ya da hatalı kaydı filtrele
-    const validData = (data || []).filter(
-      (row) => row.unique_id && row.analysis_response
-    );
-    setAnalysisRows(validData);
+    // Kuyruk ve analiz verilerini birleştir
+    const combined = queueData.map((queueItem) => {
+      const analysisItem = analysisData?.find(
+        (a) => a.unique_id === queueItem.unique_id
+      );
+      return {
+        id: queueItem.id,
+        unique_id: queueItem.unique_id,
+        status: queueItem.status,
+        created_at: queueItem.created_at,
+        analysis_response: analysisItem?.analysis_response || null,
+        pdf_url: analysisItem?.pdf_url || null,
+      };
+    });
+
+    setCombinedItems(combined || []);
   };
 
-  // Analize gönder
-  const handleEnqueue = async () => {
+  const handleAnalyze = async () => {
     if (!selectedFiles.length) {
-      setError("Lütfen en az bir beyanname seçin.");
+      setSnackbar({
+        open: true,
+        message: "Lütfen en az bir beyanname seçin.",
+        severity: "error",
+      });
       return;
     }
-    setError("");
     setLoading(true);
-
     try {
-      const session = await refreshSession();
-      if (!session) throw new Error("Oturum bulunamadı.");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
 
       const uniqueId = uuidv4();
       const payload = {
@@ -127,8 +125,7 @@ export default function AnalizPage() {
         json_data: selectedFiles.map((f) => f.json_data),
       };
 
-      // Kuyruğa ekleyen API endpoint (örneğin /api/queue-analyze)
-      const res = await fetch("/api/queue-analyze", {
+      const res = await fetch(analyzeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -137,144 +134,119 @@ export default function AnalizPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const errorMsg = await res.text();
-        throw new Error(`Analiz kuyruğa eklenemedi: ${errorMsg}`);
-      }
+      if (!res.ok) throw new Error(await res.text());
 
-      // Kuyruğu güncelle
-      await fetchQueue();
+      setSnackbar({
+        open: true,
+        message: "Analiz kuyruğa eklendi.",
+        severity: "success",
+      });
+      fetchAllData();
     } catch (err) {
-      setError(err.message);
+      console.error("Analyze error:", err);
+      setSnackbar({
+        open: true,
+        message: `Hata: ${err.message}`,
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Durum sorgulama
   const checkStatus = async (uniqueId) => {
-    setSnackbar({ open: true, message: "Sorgulanıyor...", severity: "info" });
     try {
-      const session = await refreshSession();
-      if (!session) throw new Error("Oturum bulunamadı.");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
 
-      const res = await fetch(`/api/check-status?unique_id=${uniqueId}`, {
+      const res = await fetch(`${checkStatusUrl}?unique_id=${uniqueId}`, {
         method: "GET",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (!res.ok) throw new Error(await res.text());
+
       const result = await res.json();
-
-      if (!res.ok) throw new Error(result.error || "Durum sorgulama başarısız.");
-
       if (result.completed) {
         setSnackbar({
           open: true,
-          message: "Tamamlandı. Veriler çekiliyor...",
+          message: "Analiz tamamlandı!",
           severity: "success",
         });
-        // Tüm tablo verilerini yenile
-        await fetchAllData();
-      } else if (result.status === "failed" && result.logs) {
+        fetchAllData();
+      } else if (result.status === "processing") {
         setSnackbar({
           open: true,
-          message: `Analiz FAILED. Hata: ${result.logs.error_message}`,
-          severity: "error",
-        });
-      } else {
-        setSnackbar({
-          open: true,
-          message: "Henüz tamamlanmadı :Sorgera Beyanname AI Raporunuzu Oluşturuyor...",
+          message: "Analiz hala devam ediyor...",
           severity: "info",
+        });
+      } else if (result.status === "pending") {
+        setSnackbar({
+          open: true,
+          message: "Analiz kuyrukta bekliyor.",
+          severity: "info",
+        });
+      } else if (result.status === "failed") {
+        setSnackbar({
+          open: true,
+          message: "Analiz başarısız oldu.",
+          severity: "error",
         });
       }
     } catch (err) {
-      setError(err.message);
+      console.error("Check status error:", err);
       setSnackbar({
         open: true,
-        message: "Hata oluştu.",
+        message: `Durum sorgulama hatası: ${err.message}`,
         severity: "error",
       });
     }
   };
 
-  // Kuyruktan sil
-  const deleteQueueItem = async (id) => {
+  const generatePdf = async (uniqueId, analysisResponse) => {
+    setLoading(true);
     try {
-      const session = await refreshSession();
-      if (!session) throw new Error("Oturum bulunamadı.");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
 
-      // .eq("user_id", session.user.id) sorgusu tablonuzda user_id varsa
-      // kullanıcıya ait kaydı sildiğinizden emin olmak için kullanılıyor.
-      const { error } = await supabase
-        .from("analysis_queue")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", session.user.id);
-
-      if (error) throw new Error(`Silme işlemi başarısız: ${error.message}`);
-
-      setSnackbar({
-        open: true,
-        message: "Kayıt başarıyla silindi.",
-        severity: "success",
-      });
-      await fetchQueue();
-    } catch (err) {
-      setError(err.message);
-      setSnackbar({
-        open: true,
-        message: `Silme hatası: ${err.message}`,
-        severity: "error",
-      });
-    }
-  };
-
-  // PDF oluşturma ve yükleme
-  const generateAndUploadPdf = async (uniqueId, analysisResponse) => {
-    try {
-      const session = await refreshSession();
-      if (!session) throw new Error("Oturum bulunamadı.");
-
-      const payload = {
-        unique_id: uniqueId,
-        analysis_response: analysisResponse,
-      };
-
-      // PDF oluşturan API endpoint (örneğin /api/generate-pdf)
-      const res = await fetch("/api/generate-pdf", {
+      const res = await fetch(generatePdfUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          unique_id: uniqueId,
+          analysis_response: analysisResponse,
+        }),
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "PDF oluşturma başarısız");
+      if (!res.ok) throw new Error(await res.text());
 
-      await fetchAllData();
-
-      // PDF URL varsa direkt yeni sekmede aç
-      if (result.pdfUrl) {
-        window.open(result.pdfUrl, "_blank");
-      }
+      const { pdfUrl } = await res.json();
+      setSnackbar({
+        open: true,
+        message: "PDF oluşturuldu ve indiriliyor...",
+        severity: "success",
+      });
+      window.open(pdfUrl, "_blank");
+      fetchAllData();
     } catch (err) {
-      setError(`PDF oluşturulurken hata oluştu: ${err.message}`);
+      console.error("PDF generation error:", err);
+      setSnackbar({
+        open: true,
+        message: `PDF oluşturma hatası: ${err.message}`,
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // PDF indirme
-  const downloadPdf = (uniqueId) => {
-    const row = analysisRows.find((r) => r.unique_id === uniqueId);
-    if (row && row.pdf_url) {
-      window.open(row.pdf_url, "_blank");
-    } else {
-      setError("PDF URL bulunamadı.");
-    }
-  };
-
-  // Beyanname kolonları
+  /* Beyannameler tablosunun kolonları */
   const beyannameCols = [
     { field: "firma_adi", headerName: "Firma", flex: 1 },
     { field: "vergi_no", headerName: "Vergi No", flex: 1 },
@@ -283,10 +255,26 @@ export default function AnalizPage() {
     { field: "beyanname_turu", headerName: "Beyanname Türü", flex: 1 },
   ];
 
-  // Kuyruk kolonları
-  const queueCols = [
-    { field: "unique_id", headerName: "ID", width: 230 },
-    { field: "status", headerName: "Durum", width: 100 },
+  /* Analizler tablosunun kolonları */
+  const combinedCols = [
+    { field: "unique_id", headerName: "ID", width: 220 },
+    {
+      field: "status",
+      headerName: "Durum",
+      width: 120,
+      renderCell: ({ value }) => {
+        if (value === "completed") {
+          return <CheckCircleIcon style={{ color: "green" }} />;
+        }
+        if (value === "pending") {
+          return <HourglassTopIcon style={{ color: "orange" }} />;
+        }
+        if (value === "failed") {
+          return <ErrorIcon style={{ color: "red" }} />;
+        }
+        return null;
+      },
+    },
     {
       field: "created_at",
       headerName: "Tarih",
@@ -294,117 +282,92 @@ export default function AnalizPage() {
       renderCell: ({ value }) => new Date(value).toLocaleString("tr-TR"),
     },
     {
-      field: "action",
-      headerName: "İşlem",
-      width: 250,
+      field: "analysis_response",
+      headerName: "Analiz Özeti",
+      flex: 1,
+      renderCell: ({ value }) =>
+        value ? (value.length > 100 ? value.slice(0, 100) + "..." : value) : "Analiz Bekleniyor",
+    },
+    {
+      field: "actions",
+      headerName: "İşlemler",
+      width: 220,
       renderCell: ({ row }) => (
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {row.status === "completed" ? (
-            <Button variant="contained" color="success">
-              Tamamlandı
-            </Button>
-          ) : row.status === "failed" ? (
-            <Typography sx={{ color: "red" }}>İşlem Başarısız</Typography>
-          ) : (
-            <Button variant="contained" onClick={() => checkStatus(row.unique_id)}>
-              Durum Sorgula
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%" }}>
+          {row.status !== "completed" && row.status !== "failed" && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={() => checkStatus(row.unique_id)}
+            >
+              Durum
             </Button>
           )}
-
-          {/* Silme butonu her satırda */}
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => deleteQueueItem(row.id)}
-          >
-            Sil
-          </Button>
+          {row.status === "completed" && !row.pdf_url && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={() => generatePdf(row.unique_id, row.analysis_response)}
+              disabled={loading}
+            >
+              PDF Oluştur
+            </Button>
+          )}
+          {row.status === "completed" && row.pdf_url && (
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              onClick={() => window.open(row.pdf_url, "_blank")}
+            >
+              PDF İndir
+            </Button>
+          )}
         </Box>
       ),
     },
   ];
 
-  // Analiz kolonları
-  const analysisCols = [
-    { field: "unique_id", headerName: "ID", width: 230 },
-    {
-      field: "analysis_response",
-      headerName: "Analiz",
-      flex: 1,
-      renderCell: ({ value }) =>
-        value ? (value.length > 100 ? value.slice(0, 100) + "..." : value) : "Veri yok",
-    },
-    {
-      field: "client_pdf",
-      headerName: "PDF",
-      width: 150,
-      renderCell: ({ row }) =>
-        row.pdf_url ? (
-          <Button
-            variant="contained"
-            color="success"
-            onClick={() => downloadPdf(row.unique_id)}
-          >
-            PDF İndir
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            disabled={!row.unique_id || !row.analysis_response}
-            onClick={() => generateAndUploadPdf(row.unique_id, row.analysis_response)}
-          >
-            PDF Oluştur
-          </Button>
-        ),
-    },
-    {
-      field: "created_at",
-      headerName: "Tarih",
-      width: 160,
-      renderCell: ({ value }) => new Date(value).toLocaleString("tr-TR"),
-    },
-  ];
-
-  const handleSnackbarClose = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
   return (
     <Box className="analiz-container">
-      <Box className="analiz-header">
-        <Typography variant="h4">Beyanname Analiz Platformu</Typography>
-        <Link href="/dashboard" className="nav-link">
-          Dashboard
+      {/* Navbar */}
+      <Box className="navbar">
+        <Link href="/dashboard">
+          <Button className="nav-button">Kontrol Paneli</Button>
+        </Link>
+        <Link href="/dashboard/upload">
+          <Button className="nav-button">Beyanname Yükle</Button>
+        </Link>
+        <Link href="/dashboard/files">
+          <Button className="nav-button">Beyannamelerim</Button>
+        </Link>
+        <Link href="/analiz">
+          <Button className="nav-button active">Analiz</Button>
         </Link>
       </Box>
 
-      {error && (
-        <MuiAlert severity="error" onClose={() => setError("")}>
-          {error}
-        </MuiAlert>
-      )}
+      <Typography variant="h4" className="page-title">
+        Beyanname Analiz Platformu
+      </Typography>
 
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={handleSnackbarClose}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <MuiAlert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
-        </MuiAlert>
+        </Alert>
       </Snackbar>
 
-      <Typography variant="h6" sx={{ mt: 2 }}>
+      <Typography variant="h6" className="section-title" sx={{ mt: 2 }}>
         Beyannameler
       </Typography>
       <div className="table-wrapper">
         <DataGrid
-          className="data-table"
           rows={files}
           columns={beyannameCols}
           checkboxSelection
@@ -412,45 +375,30 @@ export default function AnalizPage() {
             const selected = files.filter((row) => sel.includes(row.id));
             setSelectedFiles(selected);
           }}
-          disableSelectionOnClick
           getRowId={(row) => row.id}
+          className="data-table"
         />
       </div>
 
       <Button
         variant="contained"
         disabled={loading || !selectedFiles.length}
-        onClick={handleEnqueue}
+        onClick={handleAnalyze}
+        className="analyze-button"
         sx={{ mt: 2 }}
       >
-        {loading ? (
-          <CircularProgress size={20} />
-        ) : (
-          `Analize Gönder (${selectedFiles.length})`
-        )}
+        {loading ? <CircularProgress size={20} /> : `Analize Gönder (${selectedFiles.length})`}
       </Button>
 
-      <Typography variant="h6" sx={{ mt: 4 }}>
-        Analiz Kuyruğu
+      <Typography variant="h6" className="section-title" sx={{ mt: 4 }}>
+        Analizler
       </Typography>
-      <div style={{ height: 300 }}>
+      <div className="table-wrapper">
         <DataGrid
-          className="data-table"
-          rows={queueItems}
-          columns={queueCols}
+          rows={combinedItems}
+          columns={combinedCols}
           getRowId={(row) => row.id}
-        />
-      </div>
-
-      <Typography variant="h6" sx={{ mt: 4 }}>
-        Tamamlanmış Analizler
-      </Typography>
-      <div style={{ height: 300 }}>
-        <DataGrid
           className="data-table"
-          rows={analysisRows}
-          columns={analysisCols}
-          getRowId={(row) => row.id}
         />
       </div>
     </Box>

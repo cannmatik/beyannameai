@@ -1,136 +1,313 @@
-/* src/app/analiz/analiz-style.css */
-.analiz-container {
-  padding: 2rem;
-  background-color: #0d0d0d;
-  color: #f2f2f2;
-  min-height: 100vh;
-  font-family: 'Segoe UI', sans-serif;
+/*------------------------------------------------
+  Montserrat (Black ve Regular) – public/fonts klasöründe
+--------------------------------------------------*/
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-Black.ttf") format("truetype");
+  font-weight: 900; /* Black */
+  font-style: normal;
 }
 
-.analiz-header {
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-Regular.ttf") format("truetype");
+  font-weight: 400; /* Regular */
+  font-style: normal;
+}
+
+/*------------------------------------------------
+  Body
+--------------------------------------------------*/
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular varsayılan */
+  font-size: 16px;
+  line-height: 1.6;
+  color: #000; /* Tüm metin siyah */
+  background-color: #f5f5f5; /* Hafif gri arka plan */
+  box-sizing: border-box;
+}
+
+/*------------------------------------------------
+  Analiz Container
+--------------------------------------------------*/
+.analiz-container {
+  padding: 32px;
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: #fafafa; /* Beyazı hafif griye çektik */
+  border: 1px solid #e0e0e0; /* Daha yumuşak bir sınır */
+  border-radius: 6px;
+}
+
+/*------------------------------------------------
+  Navbar
+--------------------------------------------------*/
+.navbar {
+  display: flex;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e0e0e0; /* Daha yumuşak sınır */
+  margin-bottom: 24px;
+}
+
+.nav-button {
+  background: transparent;
+  color: #000 !important; /* Siyah */
+  padding: 8px 16px;
+  font-size: 14px;
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 900 !important; /* Navbar’da Black */
+  border: 2px solid transparent;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.nav-button:hover {
+  background-color: #f0f0f0;
+  color: #bd2f2c !important; /* Hover’da kırmızı */
+}
+
+.nav-button.active {
+  background: #bd2f2c;
+  color: #fff !important; /* Aktif sayfa beyaz */
+}
+
+/* MUI Button çakışmasını önlemek için */
+.MuiButton-root.nav-button {
+  color: #000 !important;
+  font-weight: 900 !important;
+}
+
+.MuiButton-root.nav-button.active {
+  color: #fff !important; /* Aktifken beyaz */
+}
+
+/*------------------------------------------------
+  Sayfa Başlığı (page-title)
+--------------------------------------------------*/
+.page-title {
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  font-size: 36px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+/*------------------------------------------------
+  Alt Başlık (section-title)
+--------------------------------------------------*/
+.section-title {
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  font-size: 21px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  position: relative;
+}
+
+.section-title::after {
+  content: "";
+  display: block;
+  height: 4px;
+  width: 40px;
+  background-color: #bd2f2c;
+  margin-top: 10px;
+  border-radius: 2px;
+}
+
+/*------------------------------------------------
+  Tablo Wrapper
+--------------------------------------------------*/
+.table-wrapper {
+  background: #fcfcfc; /* Çok hafif gri, göz yormasın */
+  border: 1px solid #e0e0e0; /* Daha yumuşak sınır */
+  border-radius: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  min-height: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Daha hafif gölge */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.table-wrapper:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+/*------------------------------------------------
+  DataGrid Özelleştirmeleri
+--------------------------------------------------*/
+.data-table {
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  font-size: 15px;
+  border: none;
+}
+
+/* Sütun başlıkları */
+.MuiDataGrid-columnHeaderTitle {
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  font-size: 14px;
+}
+
+/* Hücreler */
+.MuiDataGrid-cell {
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  border-bottom: 1px solid #e0e0e0; /* Daha yumuşak sınır */
+}
+
+/* Seçili satır */
+.MuiDataGrid-row.Mui-selected {
+  background-color: #f5f5f5 !important; /* Hafif gri */
+  transition: background-color 0.2s ease;
+}
+
+/*------------------------------------------------
+  Analize Gönder Butonu
+--------------------------------------------------*/
+.analyze-button {
+  background: #bd2f2c;
+  color: #fff;
+  padding: 10px 24px;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400; /* Regular */
+  font-size: 16px;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.analyze-button:hover {
+  background: #a52825;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.analyze-button:disabled {
+  background: #888;
+  color: #fff;
+  opacity: 0.7;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/*------------------------------------------------
+  MUI Butonları (Durum Sorgu / PDF)
+--------------------------------------------------*/
+.MuiButton-containedPrimary {
+  background: #bd2f2c !important;
+  color: #fff !important;
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 400 !important; /* Regular */
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.MuiButton-containedPrimary:hover {
+  background: #a52825 !important;
+}
+
+.MuiButton-containedSuccess {
+  background: #bd2f2c !important;
+  color: #fff !important;
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 400 !important; /* Regular */
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.MuiButton-containedSuccess:hover {
+  background: #a52825 !important;
+}
+
+/* Sıra içi butonlar (DataGrid actions) */
+.MuiDataGrid-cell .MuiBox-root {
+  height: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
+  gap: 4px;
 }
 
-.nav-link {
-  background-color: #555;
-  color: #fff;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  transition: background-color 0.3s, color 0.3s;
-}
-.nav-link:hover {
-  background-color: #333;
-  color: #fff;
-}
-
-.analiz-content {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.table-wrapper {
-  height: 400px;
-  margin-bottom: 1rem;
-}
-
-.analiz-panel {
-  margin-bottom: 2rem;
-  background-color: #111;
-  padding: 1rem;
-  border-radius: 8px;
-  color: #f2f2f2;
-}
-
-.panel-heading {
-  font-size: 1.75rem;
-  margin-bottom: 1rem;
-  text-align: center;
-  color: #1a73e8;
-}
-
-.action-section {
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.analiz-button {
-  background-color: #1a73e8;
-  color: #fff;
-  border: none;
-  padding: 1rem 2rem;
-  font-size: 1rem;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
-.analiz-button:hover {
-  background-color: #1669c1;
-}
-
-.loading-bar {
-  text-align: center;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-}
-
-.error-message {
-  text-align: center;
-  color: #ff4d4d;
-  margin-bottom: 1rem;
-}
-
-.analiz-result {
-  background-color: #222;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-top: 2rem;
-  text-align: center;
-  color: #f2f2f2;
-}
-
-.pdf-download a {
-  color: #1a73e8;
-  text-decoration: underline;
-}
-
-.previous-analyses {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.analysis-item {
-  background-color: #333;
-  padding: 1rem;
-  border-radius: 8px;
-  color: #f2f2f2;
-}
-
-.data-table {
-  color: #f2f2f2 !important;
-}
-
-.data-table .MuiDataGrid-columnHeaders {
+/*------------------------------------------------
+  Snackbar
+--------------------------------------------------*/
+.MuiSnackbarContent-root {
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 400 !important; /* Regular */
+  font-size: 14px !important;
+  border-radius: 3px !important;
   background-color: #fff !important;
   color: #000 !important;
-  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
-.data-table .MuiDataGrid-row {
-  background-color: #222 !important;
-}
-.data-table .MuiDataGrid-row:hover {
-  background-color: #333 !important;
+.MuiAlert-message {
+  color: #000 !important;
+  font-family: "Montserrat", sans-serif !important;
+  font-weight: 400 !important; /* Regular */
 }
 
-/* Tamamlandı butonunun hizalanması için */
-.data-table .MuiButton-root {
-  margin: 0.5rem 0; /* Dikey boşluk */
+/*------------------------------------------------
+  Scrollbars (isteğe bağlı)
+--------------------------------------------------*/
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #bd2f2c #e0e0e0;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #e0e0e0;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #bd2f2c;
+  border-radius: 4px;
+}
+
+/*------------------------------------------------
+  Responsive
+--------------------------------------------------*/
+@media only screen and (max-width: 768px) {
+  .navbar {
+    flex-wrap: wrap;
+  }
+  .nav-button {
+    margin-bottom: 8px;
+  }
+  .page-title {
+    font-size: 28px;
+  }
+}
+
+@media only screen and (max-width: 480px) {
+  .page-title {
+    font-size: 24px;
+  }
+  .section-title {
+    font-size: 18px;
+  }
+  .analyze-button {
+    font-size: 14px;
+    padding: 8px 16px;
+  }
 }

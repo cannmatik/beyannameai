@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { XMLParser } from "fast-xml-parser";
-import "./style.css";
+import "@/app/styles/global-style.css";
 
 export default function Dashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPopup, setShowPopup] = useState(false);
@@ -18,7 +19,6 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
@@ -32,14 +32,12 @@ export default function Dashboard() {
         .eq("user_id", user.id)
         .single();
 
-      // Eğer herhangi bir hata alınırsa veya veri yoksa, popup'ı gösteriyoruz.
       if (error || !data) {
         console.error("Error fetching company info:", error ? error.message : "No data returned");
         setShowPopup(true);
       } else {
         setCompanyData(data);
       }
-
       setLoading(false);
     };
 
@@ -49,7 +47,6 @@ export default function Dashboard() {
   const handleFileUpload = async (file) => {
     setError("");
     setLoading(true);
-
     try {
       const fileText = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -69,17 +66,9 @@ export default function Dashboard() {
 
       const { error: insertError } = await supabase
         .from("company_info")
-        .insert([
-          {
-            user_id: user.id,
-            firma_adi: firmaAdiRaw,
-            vergi_no: vergiNo,
-          },
-        ]);
+        .insert([{ user_id: user.id, firma_adi: firmaAdiRaw, vergi_no: vergiNo }]);
 
-      if (insertError) {
-        throw new Error(`Kayıt hatası: ${insertError.message}`);
-      }
+      if (insertError) throw new Error(`Kayıt hatası: ${insertError.message}`);
 
       const { data } = await supabase
         .from("company_info")
@@ -109,9 +98,18 @@ export default function Dashboard() {
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
-         <Link href="/analiz" className="nav-link">Analiz</Link>
-        <Link href="/dashboard/upload" className="nav-link">Dosya Yükle</Link>
-        <Link href="/dashboard/files" className="nav-link">Dosyalar</Link>
+        <Link href="/dashboard" className={`nav-link ${pathname === '/dashboard' ? 'active' : ''}`}>
+          Kontrol Paneli
+        </Link>
+        <Link href="/analiz" className={`nav-link ${pathname === '/analiz' ? 'active' : ''}`}>
+          Analiz
+        </Link>
+        <Link href="/dashboard/upload" className={`nav-link ${pathname === '/dashboard/upload' ? 'active' : ''}`}>
+          Dosya Yükle
+        </Link>
+        <Link href="/dashboard/files" className={`nav-link ${pathname === '/dashboard/files' ? 'active' : ''}`}>
+          Dosyalar
+        </Link>
         <button onClick={handleLogout} className="logout-btn">Çıkış Yap</button>
       </header>
 
@@ -129,9 +127,7 @@ export default function Dashboard() {
                 accept=".xml"
                 id="fileInput"
                 className="file-input"
-                onChange={(e) =>
-                  e.target.files && handleFileUpload(e.target.files[0])
-                }
+                onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
               />
               <label htmlFor="fileInput" className="upload-btn">
                 XML Yükle

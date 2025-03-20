@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
-import "../globals.css"; // Tek global import => tailwind + theme
+import "@/app/styles/global-style.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <div className="page-container">
       <header className="header-bar">
-        <Link href="/">Ana Sayfa</Link>
+        <Link href="/" className="auth-home-button">Ana Sayfa</Link>
       </header>
 
       <main className="main-content">
@@ -57,9 +57,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p style={{ marginTop: "1rem" }}>
+          <p className="auth-text">
             Hesabınız yok mu?{" "}
-            <Link href="/signup" style={{ fontWeight: 600, color: "#0d6efd" }}>
+            <Link href="/signup" className="auth-link">
               Kayıt Ol
             </Link>
           </p>
