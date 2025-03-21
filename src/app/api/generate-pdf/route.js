@@ -81,6 +81,7 @@ export async function POST(request) {
     const { width, height } = page.getSize();
     let yPosition = height - 50;
     const maxWidth = 500;
+    const bottomMargin = 50; // Sayfa alt sınırı
 
     // Başlık (Sorgera kırmızısı)
     const title = "Sorgera Beyanname AI Analiz Raporu";
@@ -94,13 +95,17 @@ export async function POST(request) {
     });
     yPosition -= 40;
 
-    // Gövde içeriği (analysis_response)
+    // Satırları işle
     const rawLines = analysis_response.split("\n");
 
     for (let rawLine of rawLines) {
       let line = rawLine.trim();
       if (!line) {
-        yPosition -= 15; // Boş satır için boşluk
+        yPosition -= 15; // Boş satır
+        if (yPosition < bottomMargin) {
+          page = pdfDoc.addPage([595.28, 841.89]);
+          yPosition = height - 50;
+        }
         continue;
       }
 
@@ -113,10 +118,11 @@ export async function POST(request) {
         continue; // Tablo ayırıcı satırları atla
       }
 
-      // Markdown’a göre stil belirleme
+      // Stil belirleme
       let font = montserratRegular;
       let size = 10;
       let indent = 0;
+      let lineSpacing = 5;
 
       if (line.startsWith("# ")) {
         font = montserratBlack;
@@ -135,12 +141,18 @@ export async function POST(request) {
         line = line.replace("### ", "");
         indent = 20;
         yPosition -= 12;
+      } else if (line.startsWith("#### ")) {
+        font = montserratBold;
+        size = 10;
+        line = line.replace("#### ", "");
+        indent = 30;
+        yPosition -= 10;
       } else if (line.startsWith("- ")) {
         font = montserratRegular;
         line = `• ${line.replace("- ", "")}`;
         indent = 30;
       } else {
-        font = montserratItalic; // Normal metin için italic
+        font = montserratItalic; // Normal metin
       }
 
       // Metni satırlara böl
@@ -160,8 +172,10 @@ export async function POST(request) {
       }
       if (currentLine) splitLines.push(currentLine);
 
+      // Satırları yazdır
       for (const splitLine of splitLines) {
-        if (yPosition < 50) {
+        const lineHeight = size + lineSpacing;
+        if (yPosition - lineHeight < bottomMargin) {
           page = pdfDoc.addPage([595.28, 841.89]);
           yPosition = height - 50;
         }
@@ -170,9 +184,9 @@ export async function POST(request) {
           y: yPosition,
           size,
           font,
-          color: rgb(0, 0, 0), // Her şey siyah
+          color: rgb(0, 0, 0),
         });
-        yPosition -= size + 5;
+        yPosition -= lineHeight;
       }
     }
 
