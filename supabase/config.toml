@@ -1,4 +1,3 @@
-
 [functions.queue-analyze]
 entrypoint = "./functions/queue-analyze/index.js"
 
@@ -7,3 +6,6 @@ entrypoint = "./functions/process-analyze/index.js"
 
 [functions.check-status]
 entrypoint = "./functions/check-status/index.js"
+
+[functions.batch-analyze]
+entrypoint = "./functions/batch-analyze/index.js"

@@ -4,14 +4,14 @@
 @font-face {
   font-family: "Montserrat";
   src: url("/fonts/Montserrat-Black.ttf") format("truetype");
-  font-weight: 900; /* Black */
+  font-weight: 900;
   font-style: normal;
 }
 
 @font-face {
   font-family: "Montserrat";
   src: url("/fonts/Montserrat-Regular.ttf") format("truetype");
-  font-weight: 400; /* Regular */
+  font-weight: 400;
   font-style: normal;
 }
 
@@ -31,12 +31,10 @@ body {
 }
 
 /*------------------------------------------------
-  Page Container (Genel ve Homepage için)
+  Page Container (Dashboard ve Analiz için)
 --------------------------------------------------*/
-.page-container,
-.analiz-container,
 .dashboard-container,
-.auth-page {
+.analiz-container {
   padding: 32px;
   max-width: 1280px;
   margin: 0 auto;
@@ -46,20 +44,11 @@ body {
   border-radius: 6px;
 }
 
-.home-page {
-  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /*------------------------------------------------
-  Header (Navbar ve Auth Header)
+  Navbar (Header)
 --------------------------------------------------*/
 .navbar,
-.dashboard-header,
-.header-bar,
-.auth-header {
+.dashboard-header {
   display: flex;
   gap: 16px;
   padding: 16px;
@@ -70,8 +59,7 @@ body {
 
 .nav-button,
 .nav-link,
-.logout-btn,
-.auth-home-button {
+.logout-btn {
   background: #fff;
   color: #000 !important;
   padding: 8px 16px;
@@ -87,8 +75,7 @@ body {
 
 .nav-button:hover,
 .nav-link:hover,
-.logout-btn:hover,
-.auth-home-button:hover {
+.logout-btn:hover {
   background-color: #f0f0f0;
   color: #bd2f2c !important;
 }
@@ -105,201 +92,6 @@ body {
 }
 .MuiButton-root.nav-button.active {
   color: #fff !important;
-}
-
-/*------------------------------------------------
-  Main Content
---------------------------------------------------*/
-.main-content,
-.auth-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-/*------------------------------------------------
-  Typewriter Container ve Effect (Homepage)
---------------------------------------------------*/
-.typewriter-container {
-  min-height: 80px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 24px;
-  width: 100%;
-  max-width: 800px;
-}
-
-.page-title.typewriter {
-  color: #bd2f2c;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 900;
-  font-size: 36px;
-  text-align: center;
-  overflow: hidden;
-  border-right: 4px solid #000;
-  animation: blink-caret 0.75s step-end infinite, glow 2s infinite alternate;
-  line-height: 1.2;
-}
-
-@keyframes blink-caret {
-  from, to { border-color: transparent; }
-  50% { border-color: #000; }
-}
-
-@keyframes glow {
-  0% { text-shadow: 0 0 5px rgba(189, 47, 44, 0.5); }
-  100% { text-shadow: 0 0 15px rgba(189, 47, 44, 0.8); }
-}
-
-/*------------------------------------------------
-  Welcome Text
---------------------------------------------------*/
-.welcome-text {
-  color: #333;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 400;
-  font-size: 1.25rem;
-  margin-bottom: 2rem;
-  text-align: center;
-  max-width: 600px;
-}
-
-/*------------------------------------------------
-  CTA Buttons (Homepage)
---------------------------------------------------*/
-.cta-buttons {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  margin-top: 24px;
-}
-
-.analyze-button {
-  padding: 12px 32px;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 900;
-  font-size: 16px;
-  border-radius: 6px;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-.primary-btn {
-  background: #bd2f2c;
-  color: #fff;
-}
-
-.primary-btn:hover {
-  background: #a52825;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(189, 47, 44, 0.4);
-}
-
-.secondary-btn {
-  background: transparent;
-  color: #bd2f2c !important;
-  border: 2px solid #bd2f2c;
-}
-
-.secondary-btn:hover {
-  background: #bd2f2c;
-  color: #fff !important;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(189, 47, 44, 0.4);
-}
-
-/*------------------------------------------------
-  Login/Register Card
---------------------------------------------------*/
-.card,
-.auth-card {
-  background-color: #fafafa;
-  padding: 2rem;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  max-width: 400px;
-  width: 100%;
-  text-align: center;
-  border: 1px solid #e0e0e0;
-}
-
-.card-title,
-.auth-title {
-  color: #000;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 400;
-  font-size: 32px;
-  margin-bottom: 24px;
-}
-
-.form-input,
-.auth-input {
-  width: 100%;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 3px;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 400;
-  font-size: 14px;
-  color: #000;
-  background-color: #fff;
-}
-
-.form-button,
-.auth-button {
-  background: #bd2f2c;
-  color: #fff;
-  padding: 10px 24px;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 400;
-  font-size: 16px;
-  border-radius: 3px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s ease;
-  width: 100%;
-  cursor: pointer;
-}
-
-.form-button:hover,
-.auth-button:hover {
-  background: #a52825;
-}
-
-.error-message,
-.auth-error {
-  color: #bd2f2c;
-  margin-bottom: 12px;
-  font-weight: 500;
-}
-
-.auth-info {
-  color: #000;
-  margin-bottom: 12px;
-  font-weight: 500;
-}
-
-.auth-text {
-  color: #000;
-  font-family: "Montserrat", sans-serif;
-  font-weight: 400;
-  font-size: 14px;
-  margin-top: 1rem;
-}
-
-.auth-link {
-  color: #bd2f2c;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.auth-link:hover {
-  color: #a52825;
 }
 
 /*------------------------------------------------
@@ -647,49 +439,24 @@ body {
 --------------------------------------------------*/
 @media only screen and (max-width: 768px) {
   .navbar,
-  .dashboard-header,
-  .header-bar,
-  .auth-header {
+  .dashboard-header {
     flex-wrap: wrap;
   }
   .nav-button,
   .nav-link,
-  .logout-btn,
-  .auth-home-button {
+  .logout-btn {
     margin-bottom: 8px;
   }
-  .page-title.typewriter {
+  .dashboard-heading {
     font-size: 28px;
   }
-  .typewriter-container {
-    min-height: 70px;
-  }
-  .welcome-text {
-    font-size: 1rem;
-  }
-  .cta-buttons {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .card,
-  .auth-card {
+  .dashboard-card {
     padding: 1.5rem;
   }
 }
 
 @media only screen and (max-width: 480px) {
-  .page-title.typewriter {
+  .dashboard-heading {
     font-size: 24px;
-  }
-  .typewriter-container {
-    min-height: 60px;
-  }
-  .analyze-button {
-    padding: 10px 20px;
-    font-size: 14px;
-  }
-  .card-title,
-  .auth-title {
-    font-size: 28px;
   }
 }

@@ -4,13 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
-import "@/app/styles/global-style.css";
+import HomeIcon from "@mui/icons-material/Home";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import "@/app/styles/login.css";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -26,10 +30,9 @@ export default function LoginPage() {
 
   return (
     <div className="page-container">
-      <header className="header-bar">
-        <Link href="/" className="auth-home-button">Ana Sayfa</Link>
-      </header>
-
+      <Link href="/" className="home-icon-link">
+        <HomeIcon className="home-icon" />
+      </Link>
       <main className="main-content">
         <div className="card">
           <h2 className="card-title">Giriş Yap</h2>
@@ -44,14 +47,23 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <input
-              type="password"
-              className="form-input"
-              placeholder="Şifre"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="password-container">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="form-input"
+                placeholder="Şifre"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </button>
+            </div>
             <button type="submit" className="form-button">
               Giriş
             </button>

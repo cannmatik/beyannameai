@@ -4,19 +4,30 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
-import "@/app/styles/global-style.css";
+import { generate } from "generate-password";
+import HomeIcon from "@mui/icons-material/Home";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import "@/app/styles/signup.css";
 
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
     setInfo("");
+
+    if (password !== confirmPassword) {
+      setError("Şifreler eşleşmiyor!");
+      return;
+    }
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -33,12 +44,23 @@ export default function SignupPage() {
     }
   };
 
+  const generatePassword = () => {
+    const newPassword = generate({
+      length: 12,
+      numbers: true,
+      symbols: true,
+      uppercase: true,
+      lowercase: true,
+    });
+    setPassword(newPassword);
+    setConfirmPassword(newPassword);
+  };
+
   return (
     <div className="auth-page">
-      <header className="auth-header">
-        <Link href="/" className="auth-home-button">Ana Sayfa</Link>
-      </header>
-
+      <Link href="/" className="home-icon-link">
+        <HomeIcon className="home-icon" />
+      </Link>
       <main className="auth-main">
         <div className="auth-card">
           <h2 className="auth-title">Kayıt Ol</h2>
@@ -46,7 +68,7 @@ export default function SignupPage() {
           {info && <div className="auth-info">{info}</div>}
           {error && <div className="auth-error">{error}</div>}
 
-          <form onSubmit={handleSignup} className="auth-form">
+          <form onSubmit={handleSignup}>
             <input
               type="email"
               placeholder="E-posta adresi"
@@ -55,14 +77,38 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <div className="password-container">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Şifre"
+                className="auth-input"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <VisibilityOff /> : <Visibility />}
+              </button>
+            </div>
             <input
-              type="password"
-              placeholder="Şifre"
+              type={showPassword ? "text" : "password"}
+              placeholder="Şifreyi Onayla"
               className="auth-input"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
+            <button
+              type="button"
+              className="generate-password-btn"
+              onClick={generatePassword}
+            >
+              Şifre Oluştur
+            </button>
             <button type="submit" className="auth-button">
               Kayıt Ol
             </button>

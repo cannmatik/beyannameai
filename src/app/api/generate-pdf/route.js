@@ -44,91 +44,106 @@ export async function POST(request) {
       );
     }
 
-    // Örnek font yolları (public/fonts/ klasöründe Roboto-Regular ve Roboto-Bold olduğunu varsayıyoruz)
+    // Montserrat font yolları
     const fontDir = path.join(process.cwd(), "public", "fonts");
-    const regularFontPath = path.join(fontDir, "Roboto-Regular.ttf");
-    const boldFontPath = path.join(fontDir, "Roboto-Bold.ttf");
+    const regularFontPath = path.join(fontDir, "Montserrat-Regular.ttf");
+    const boldFontPath = path.join(fontDir, "Montserrat-Bold.ttf");
+    const italicFontPath = path.join(fontDir, "Montserrat-Italic.ttf");
+    const blackFontPath = path.join(fontDir, "Montserrat-Black.ttf");
 
-    // Fontların varlığını kontrol edelim
+    // Fontların varlığını kontrol et
     try {
       await fs.access(regularFontPath);
       await fs.access(boldFontPath);
+      await fs.access(italicFontPath);
+      await fs.access(blackFontPath);
     } catch {
       throw new Error(
-        "Roboto-Regular.ttf veya Roboto-Bold.ttf eksik. Lütfen public/fonts klasörüne ekleyin."
+        "Montserrat fontları eksik (Regular, Bold, Italic, Black). Lütfen public/fonts klasörüne ekleyin."
       );
     }
 
-    // Yeni PDF dokümanı
+    // PDF dokümanı oluştur
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
     const regularFontBytes = await fs.readFile(regularFontPath);
     const boldFontBytes = await fs.readFile(boldFontPath);
-    const robotoRegular = await pdfDoc.embedFont(regularFontBytes);
-    const robotoBold = await pdfDoc.embedFont(boldFontBytes);
+    const italicFontBytes = await fs.readFile(italicFontPath);
+    const blackFontBytes = await fs.readFile(blackFontPath);
+
+    const montserratRegular = await pdfDoc.embedFont(regularFontBytes);
+    const montserratBold = await pdfDoc.embedFont(boldFontBytes);
+    const montserratItalic = await pdfDoc.embedFont(italicFontBytes);
+    const montserratBlack = await pdfDoc.embedFont(blackFontBytes);
 
     let page = pdfDoc.addPage([595.28, 841.89]); // A4 boyutu
     const { width, height } = page.getSize();
     let yPosition = height - 50;
     const maxWidth = 500;
 
-    // Başlık
+    // Başlık (Sorgera kırmızısı)
     const title = "Sorgera Beyanname AI Analiz Raporu";
-    const titleWidth = robotoBold.widthOfTextAtSize(title, 16);
+    const titleWidth = montserratBlack.widthOfTextAtSize(title, 16);
     page.drawText(title, {
       x: (width - titleWidth) / 2,
       y: yPosition,
       size: 16,
-      font: robotoBold,
-      color: rgb(0, 0, 0),
+      font: montserratBlack,
+      color: rgb(0.74, 0.18, 0.17), // Sorgera kırmızısı: #bd2f2c
     });
     yPosition -= 40;
 
     // Gövde içeriği (analysis_response)
-    // Fazladan markdown temizliği ve tablo ayırıcı satırları atlamak
     const rawLines = analysis_response.split("\n");
 
     for (let rawLine of rawLines) {
       let line = rawLine.trim();
       if (!line) {
-        // Boş satırsa biraz boşluk bırak
-        yPosition -= 15;
+        yPosition -= 15; // Boş satır için boşluk
         continue;
       }
-      // Bazı gereksiz karakterleri temizle
-      // 4 yıldız (****) ve 2 yıldız (**) gibi
+
+      // Markdown temizliği
       line = line
-        .replace(/\*\*\*\*/g, "") // 4 yıldız
-        .replace(/\*\*/g, "") // 2 yıldız
-        .replace(/\*/g, "");  // tek yıldız
-      // Table separator satırlarını atlayalım (örneğin "|---|", "|----|", vb.)
+        .replace(/\*\*\*\*/g, "")
+        .replace(/\*\*/g, "")
+        .replace(/\*/g, "");
       if (/\|---/.test(line)) {
-        continue; // Bu satırı hiç yazdırma
+        continue; // Tablo ayırıcı satırları atla
       }
 
-      // Basit markdown başlıklarına göre tip belirleme
-      let font = robotoRegular;
+      // Markdown’a göre stil belirleme
+      let font = montserratRegular;
       let size = 10;
       let indent = 0;
 
       if (line.startsWith("# ")) {
-        font = robotoBold;
+        font = montserratBlack;
         size = 14;
         line = line.replace("# ", "");
         yPosition -= 20;
       } else if (line.startsWith("## ")) {
-        font = robotoBold;
+        font = montserratBold;
         size = 12;
         line = line.replace("## ", "");
         indent = 10;
         yPosition -= 15;
-      } else if (line.startsWith("- ")) {
-        line = `• ${line.replace("- ", "")}`;
+      } else if (line.startsWith("### ")) {
+        font = montserratBold;
+        size = 11;
+        line = line.replace("### ", "");
         indent = 20;
+        yPosition -= 12;
+      } else if (line.startsWith("- ")) {
+        font = montserratRegular;
+        line = `• ${line.replace("- ", "")}`;
+        indent = 30;
+      } else {
+        font = montserratItalic; // Normal metin için italic
       }
 
-      // Metni satırlara bölme
+      // Metni satırlara böl
       const words = line.split(" ");
       let currentLine = "";
       const splitLines = [];
@@ -155,18 +170,16 @@ export async function POST(request) {
           y: yPosition,
           size,
           font,
-          color: rgb(0, 0, 0),
+          color: rgb(0, 0, 0), // Her şey siyah
         });
         yPosition -= size + 5;
       }
     }
 
-    // NOT: Footer'da tekrar "Developed by Can Matik" eklenmemesi için kaldırdık.
-
-    // PDF'i byte array olarak oluştur
+    // PDF’i byte array olarak kaydet
     const pdfBytes = await pdfDoc.save();
 
-    // Storage'a yükle
+    // Supabase Storage’a yükle
     const fileName = `${unique_id}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from("analysis-pdfs")
@@ -185,8 +198,8 @@ export async function POST(request) {
       .from("analysis-pdfs")
       .getPublicUrl(fileName);
 
-    // PDF URL'sini beyanname_analysis tablosuna kaydet
-    const { data, error: updateError } = await supabase
+    // PDF URL’sini güncelle
+    const { error: updateError } = await supabase
       .from("beyanname_analysis")
       .update({ pdf_url: publicUrl.publicUrl })
       .eq("unique_id", unique_id);
@@ -196,7 +209,6 @@ export async function POST(request) {
       throw new Error(`PDF URL güncelleme hatası: ${updateError.message}`);
     }
 
-    // Dönen data boş olabilir, problem değil
     return new Response(
       JSON.stringify({ success: true, pdfUrl: publicUrl.publicUrl }),
       {

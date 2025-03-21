@@ -23,6 +23,8 @@
     "blob-stream": "^0.1.3",
     "fast-xml-parser": "^5.0.9",
     "fontkit": "^2.0.4",
+    "framer-motion": "^12.5.0",
+    "generate-password": "^1.7.1",
     "jspdf": "^3.0.1",
     "jszip": "^3.10.1",
     "next": "15.2.2",
