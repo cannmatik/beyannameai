@@ -18,7 +18,7 @@
     max-width: 1280px;
     margin: 0 auto;
     min-height: 100vh;
-    background: linear-gradient(135deg, #ffffff 0%, #f8ebeb 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #f8ebeb 100%) !important;
     border: 1px solid #e0d0d0;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(189, 47, 44, 0.05);
@@ -37,7 +37,7 @@
   }
   
   .home-icon {
-    font-size: 32px; /* Daha büyük */
+    font-size: 32px;
     transition: color 0.3s ease;
   }
   
@@ -75,7 +75,7 @@
   
   .form-input {
     width: 100%;
-    padding: 12px 20px;
+    padding: 12px 40px 12px 20px;
     margin-bottom: 20px;
     border: 1px solid #e0d0d0;
     border-radius: 12px;
@@ -93,13 +93,9 @@
     margin-bottom: 20px;
   }
   
-  .password-container .form-input {
-    padding-right: 50px; /* İkon için yer */
-  }
-  
   .toggle-password {
     position: absolute;
-    right: 15px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
     background: transparent;
@@ -114,6 +110,37 @@
   }
   
   .toggle-password:hover {
+    color: #a52825;
+  }
+  
+  .options-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .remember-me {
+    display: flex;
+    align-items: center;
+    font-family: "Montserrat", sans-serif;
+    font-size: 14px;
+    color: #2e2e2e;
+  }
+  
+  .remember-me input {
+    margin-right: 8px;
+  }
+  
+  .forgot-password-link {
+    color: #bd2f2c;
+    font-family: "Montserrat", sans-serif;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  
+  .forgot-password-link:hover {
     color: #a52825;
   }
   

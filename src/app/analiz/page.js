@@ -6,6 +6,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import { Button, Typography, Box, CircularProgress, Snackbar, Alert, Dialog, DialogContent, DialogActions, IconButton } from "@mui/material";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import "./analiz-style.css";
 
 /* MUI Icons */
@@ -15,37 +16,83 @@ import ErrorIcon from "@mui/icons-material/Error";
 import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-const Typewriter = ({ texts, speed = 100, delay = 2000 }) => {
-  const [displayText, setDisplayText] = useState("");
+// Typewriter bileşeni: Profesyonel ve modern
+const Typewriter = ({ texts }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const currentText = texts && texts.length > 0 ? texts[currentIndex] : "Yükleniyor...";
 
   useEffect(() => {
-    const currentText = texts[currentIndex];
-    const timeout = setTimeout(() => {
-      if (!isDeleting && charIndex < currentText.length) {
-        setDisplayText((prev) => prev + currentText[charIndex]);
-        setCharIndex(charIndex + 1);
-      } else if (isDeleting && charIndex > 0) {
-        setDisplayText((prev) => prev.slice(0, -1));
-        setCharIndex(charIndex - 1);
-      } else if (!isDeleting && charIndex === currentText.length) {
-        setTimeout(() => setIsDeleting(true), delay);
-      } else if (isDeleting && charIndex === 0) {
-        setIsDeleting(false);
-        setCurrentIndex((prev) => (prev + 1) % texts.length);
-      }
-    }, isDeleting ? speed / 2 : speed);
+    if (!texts || texts.length === 0) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % texts.length);
+    }, 5000); // Her metin 5 saniye görünür
+    return () => clearInterval(interval);
+  }, [texts]);
 
-    return () => clearTimeout(timeout);
-  }, [charIndex, isDeleting, currentIndex, texts, speed, delay]);
+  // Animasyon varyantları: Kayma efekti
+  const textVariants = {
+    hidden: { opacity: 0, x: -50 }, // Soldan kayarak gelir
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: {
+        duration: 0.8, // Yumuşak ve profesyonel geçiş
+        ease: "easeInOut",
+      },
+    },
+    exit: {
+      opacity: 0,
+      x: 50, // Sağa kayarak çıkar
+      transition: {
+        duration: 0.5,
+        ease: "easeInOut",
+      },
+    },
+  };
+
+  // Daire imleç animasyonu
+  const dotVariants = {
+    blink: {
+      opacity: [1, 0, 1],
+      transition: {
+        duration: 1,
+        repeat: Infinity,
+        ease: "easeInOut",
+      },
+    },
+  };
 
   return (
-    <Typography variant="h4" sx={{ color: "#bd2f2c", fontWeight: "bold" }} className="typewriter">
-      {displayText}
-      <span className="cursor">|</span>
-    </Typography>
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <motion.div
+        key={currentText} // Her metin değişiminde animasyon tetiklenir
+        variants={textVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="typewriter"
+        style={{
+          fontSize: "48px",
+          fontWeight: "bold",
+          color: "#bd2f2c",
+        }}
+      >
+        {currentText}
+      </motion.div>
+      <motion.span
+        variants={dotVariants}
+        animate="blink"
+        style={{
+          display: "inline-block",
+          width: "8px",
+          height: "8px",
+          backgroundColor: "#bd2f2c",
+          borderRadius: "50%",
+          marginLeft: "8px",
+        }}
+      />
+    </Box>
   );
 };
 
@@ -61,13 +108,16 @@ export default function AnalizPage() {
   });
   const [openPopup, setOpenPopup] = useState(false);
   const [popupContent, setPopupContent] = useState("");
+  const [typewriterTexts, setTypewriterTexts] = useState([]);
 
   const analyzeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/queue-analyze`;
   const checkStatusUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-status`;
   const generatePdfUrl = "/api/generate-pdf";
+  const generateTitlesUrl = "/api/generate-titles";
 
   useEffect(() => {
     fetchAllData();
+    fetchTitles();
     const interval = setInterval(fetchAllData, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -116,6 +166,30 @@ export default function AnalizPage() {
     });
 
     setCombinedItems(combined || []);
+  };
+
+  const fetchTitles = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Oturum bulunamadı");
+
+      const res = await fetch(generateTitlesUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const { titles } = await res.json();
+      setTypewriterTexts(titles);
+    } catch (err) {
+      console.error("Başlık çekme hatası:", err);
+      setTypewriterTexts([
+        "Sorgera Beyanname AI ile Geleceği Analiz Et!",
+        "Finansal Verilerinizi Akıllıca Çözün!",
+        "Stratejik Kararlar İçin Yapay Zekâ Gücü!",
+      ]);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -304,13 +378,6 @@ export default function AnalizPage() {
     },
   ];
 
-  const typewriterTexts = [
-    "Sorgera Beyanname AI ile Geleceği Analiz Et!",
-    "Finansal Verilerinizi Akıllıca Çözün!",
-    "Stratejik Kararlar İçin Yapay Zekâ Gücü!",
-    "Beyannamelerinizden Daha Fazlasını Alın!",
-  ];
-
   return (
     <Box className="analiz-container">
       {/* Navbar */}
@@ -321,9 +388,9 @@ export default function AnalizPage() {
         <Link href="/analiz"><Button className="nav-button active">Analiz</Button></Link>
       </Box>
 
-      {/* Daktilo Efektli Başlık */}
+      {/* Profesyonel Typewriter Başlık */}
       <Box sx={{ textAlign: "center", mt: 2, mb: 4 }}>
-        <Typewriter texts={typewriterTexts} speed={100} delay={2000} />
+        <Typewriter texts={typewriterTexts} />
         <Typography variant="subtitle1" sx={{ color: "#666", mt: 1 }}>
           Finansal verilerinizi yapay zekâ ile hızlıca çözün, stratejik kararlar alın.
         </Typography>

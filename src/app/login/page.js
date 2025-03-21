@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -28,8 +29,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleForgotPassword = () => {
+    alert("Bu özellik şu an kullanım dışı, çok yakında!");
+  };
+
   return (
-    <div className="page-container">
+    <div
+      className="page-container"
+      style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8ebeb 100%)" }} // Inline stil
+    >
       <Link href="/" className="home-icon-link">
         <HomeIcon className="home-icon" />
       </Link>
@@ -63,6 +71,19 @@ export default function LoginPage() {
               >
                 {showPassword ? <VisibilityOff /> : <Visibility />}
               </button>
+            </div>
+            <div className="options-container">
+              <label className="remember-me">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                Beni Hatırla
+              </label>
+              <span className="forgot-password-link" onClick={handleForgotPassword}>
+                Şifremi Unuttum
+              </span>
             </div>
             <button type="submit" className="form-button">
               Giriş
