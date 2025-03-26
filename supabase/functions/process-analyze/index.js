@@ -43,100 +43,101 @@ serve(async (req) => {
 
     const anthropic = new Anthropic({ apiKey: claudeApiKey });
     const systemInstructions = `
-Sen, finansal analiz ve vergi danışmanlığı alanında uzun yıllara dayanan deneyime sahip, uzman bir profesyonelsin. Mali beyanname verilerini en ince ayrıntısına kadar analiz eder, şirketlerin finansal sağlıklarını, performanslarını ve vergi yükümlülüklerini değerlendirirsin. Analizlerin, yalnızca sayısal verilere dayanmakla kalmaz, aynı zamanda stratejik içgörüler ve uygulanabilir öneriler sunar. Finansal kavramları karmaşık olmaktan çıkarıp sade, anlaşılır bir dille ifade edersin. Vergilendirme değerlendirmelerinde, Türkiye’nin güncel vergi mevzuatına tam uyum sağlar ve şirketlerin vergi optimizasyonu için yaratıcı çözümler önerirsin.
+Sen, finansal analiz ve vergi danışmanlığı alanında uzun yıllara dayanan deneyime sahip, uzman bir profesyonelsin. Mali beyanname verilerini (farklı türlerde ve karışık yapıda olabilir) en ince ayrıntısına kadar analiz eder, şirketlerin finansal sağlıklarını, performanslarını ve vergi yükümlülüklerini değerlendirirsin. Analizlerin, yalnızca sayısal verilere dayanmakla kalmaz, aynı zamanda stratejik içgörüler ve uygulanabilir öneriler sunar. Finansal kavramları sade, anlaşılır bir dille ifade eder ve Türkiye’nin güncel vergi mevzuatına tam uyum sağlarsın. Şirketlerin vergi optimizasyonu için yaratıcı çözümler önerirsin.
 
-Raporlarını, profesyonel bir üslupla ve yapılandırılmış bir şekilde, **Markdown** formatında hazırlarsın. Ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' kullanırsın. Metin tabanlı açıklamalar ve listeler kullanarak, tablolardan tamamen kaçınırsın (çünkü rapor PDF’e çevrilecek). Analizlerin, şirketin karar vericilerine rehber olacak kadar detaylı, aynı zamanda net ve öz olacak şekilde dengelenmiştir.
+Raporlarını, profesyonel bir üslupla ve yapılandırılmış bir şekilde, **Markdown** formatında hazırlarsın. Ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' kullanırsın. Metin tabanlı açıklamalar ve listeler kullanarak, tablolardan tamamen kaçınırsın (çünkü rapor PDF’e çevrilecek). Analizlerin, şirketin karar vericilerine rehber olacak kadar detaylı ve kapsamlıdır.
 `;
 
     const userPrompt = `
-Aşağıdaki JSON formatındaki mali beyanname verilerini analiz ederek, şirketin finansal durumu hakkında kapsamlı bir **Finansal Analiz Raporu** oluştur. Raporu **Markdown** formatında hazırla ve aşağıdaki bölümleri detaylı, açıklayıcı ve profesyonel bir şekilde ele al. Ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' formatını kullan. Tablo kullanmaktan kaçın; bunun yerine metin tabanlı açıklamalar ve listeler kullan, çünkü rapor PDF formatında sunulacak.
+Aşağıdaki JSON formatındaki mali beyanname verilerini analiz ederek, şirketin finansal durumu hakkında **son derece kapsamlı ve detaylı bir Finansal Analiz Raporu** oluştur. JSON verisi, tek bir beyanname türünden veya birden fazla farklı beyanname türünden (örneğin, damga vergisi, KDV, gelir vergisi, kurumlar vergisi vb.) oluşabilir ve karışık bir yapıda olabilir. Raporu **Markdown** formatında hazırla; ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' formatını kullan. Tablo kullanmaktan kaçın; bunun yerine metin tabanlı açıklamalar ve listeler kullan, çünkü rapor PDF formatında sunulacak.
 
-Raporu şu bölümlerle yapılandır ve her birinde verilere dayalı derinlemesine yorumlar, içgörüler ve stratejik öneriler sun:
+Raporu şu bölümlerle yapılandır ve her birinde verilere dayalı derinlemesine yorumlar, içgörüler ve stratejik öneriler sun. Verinin yapısına göre esnek bir şekilde analiz yap; yalnızca damga vergisine odaklanmak zorunda değilsin, tüm beyanname türlerini ve ilgili vergi yüklerini dikkate al:
 
 # Şirket Bilgileri
-- Şirketin tam unvanı (yasal adı)
-- Vergi kimlik numarası
-- Kayıtlı adres (il, ilçe, açık adres)
-- İletişim bilgileri (telefon numarası, e-posta adresi)
-- Analizin kapsadığı dönem (örneğin, 2023 Q1 veya Ocak-Mart 2023)
-- Şirketin faaliyet gösterdiği ana sektör veya sektörler
+- Şirketin tam unvanı (yasal adı, veriden çıkarılabilirse)
+- Vergi kimlik numarası (varsa)
+- Kayıtlı adres (il, ilçe, açık adres; veriden çıkarılabilirse)
+- İletişim bilgileri (telefon numarası, e-posta adresi; veriden çıkarılabilirse)
+- Analizin kapsadığı dönem (örneğin, 2023 Q1, tam yıl veya birden fazla dönem)
+- Şirketin faaliyet gösterdiği ana sektör veya sektörler (veriden tahmin edilerek)
 
 # Finansal Özet
-- Toplam gelir (dönem bazında)
-- Toplam gider (kategorilere göre kısa bir özetle)
-- Net kar veya zarar
-- Toplam işlem tutarı (beyannamedeki tüm işlemlerin toplamı)
-- Toplam damga vergisi miktarı
-- Ortalama vergi oranı (damga vergisi / toplam işlem tutarı)
-- Diğer dikkat çeken finansal metrikler (örneğin, işlem başına ortalama tutar)
+- Toplam gelir (dönem bazında, tüm beyanname türlerinden elde edilen gelirler)
+- Toplam gider (kategorilere göre özet; örneğin, personel giderleri, operasyonel giderler)
+- Net kar veya zarar (tüm beyanname verileri dikkate alınarak)
+- Toplam işlem tutarı (beyannamelerdeki tüm işlemlerin toplamı)
+- Toplam vergi yükü (damga vergisi, KDV, gelir vergisi vb. tüm vergi türleri ayrı ayrı ve toplamda)
+- Ortalama vergi oranı (toplam vergi / toplam işlem tutarı; her vergi türü için ayrı ayrı hesaplanabilir)
+- Diğer dikkat çeken finansal metrikler (örneğin, işlem başına ortalama tutar, gider/gelir oranı)
 
 # İşlem Analizi
 ## İşlem Sayıları ve Türleri
-- Toplam işlem sayısı
-- Belge türlerine göre dağılım (örneğin, faturalar, makbuzlar, sözleşmeler)
+- Toplam işlem sayısı (tüm beyanname türleri dahil)
+- Belge türlerine göre dağılım (örneğin, faturalar, makbuzlar, sözleşmeler, beyanname türleri)
+- Farklı beyanname türlerinin işlem sayısına etkisi (örneğin, KDV beyannameleri daha yoğun mu?)
 ## İşlem Hacmi Dağılımı
-- İşlem hacminin aylık veya çeyreklik dağılımı (örneğin, Ocak’ta X TL, Şubat’ta Y TL)
-- İşlem yoğunluğunda dikkat çeken patternler veya anormallikler (örneğin, belirli bir ayda ani artış)
-- Ortalama işlem tutarı ve standart sapma gibi istatistiksel bilgiler
+- İşlem hacminin aylık, çeyreklik veya beyanname türüne göre dağılımı
+- İşlem yoğunluğunda dikkat çeken patternler veya anormallikler (örneğin, belirli bir vergi döneminde ani artış)
+- Ortalama işlem tutarı ve istatistiksel bilgiler (standart sapma gibi)
 
 # Önemli İşlemler
-- En yüksek tutarlı 5 işlem için:
+- En yüksek tutarlı 5 işlem için (tüm beyanname türlerinden):
   - İşlem tarihi
-  - İşlem açıklaması (kısa ve net)
+  - İşlem açıklaması (kısa ve net; beyanname türüyle ilişkilendirilerek)
   - İşlem tutarı
-  - Ödenen damga vergisi
+  - Ödenen vergi miktarı (ilgili vergi türü belirtilerek)
 - Bu işlemlerin şirketin finansal durumu üzerindeki etkisi
-- Önemli işlemlerin stratejik açıdan değerlendirilmesi
+- Önemli işlemlerin stratejik açıdan değerlendirilmesi (örneğin, büyük bir KDV iadesi mi, yüksek bir kurumlar vergisi mi?)
 
 # Sektörel Dağılım
-- İşlemlerin sektörlere göre dağılımı (örneğin, teknoloji %40, gayrimenkul %30, diğer %30)
-- Her bir sektördeki işlem hacmi ve vergi yükü
+- İşlemlerin sektörlere göre dağılımı (veriden tahmin edilerek; örneğin, teknoloji, inşaat)
+- Her bir sektördeki işlem hacmi ve vergi yükü (farklı vergi türleri dikkate alınarak)
 - Şirketin sektörel çeşitlendirme durumu hakkında yorumlar
-- Sektörel riskler veya fırsatlar üzerine kısa bir değerlendirme
+- Sektörel riskler veya fırsatlar üzerine değerlendirme
 
 # Risk ve Öneriler
 ## Potansiyel Riskler
-- Yüksek vergi yükü
-- Belirli sektörlere veya işlem türlerine aşırı bağımlılık
-- İşlem yoğunluğunda dengesizlik
+- Yüksek vergi yükü (her vergi türü için ayrı ayrı analiz)
+- Belirli sektörlere veya beyanname türlerine aşırı bağımlılık
+- İşlem yoğunluğunda dengesizlik veya mevzuata uyumsuzluk riskleri
 ## Stratejik Öneriler
-- Vergi optimizasyonu için öneriler (örneğin, muafiyetlerden yararlanma yolları)
-- Operasyonel iyileştirmeler için stratejik tavsiyeler
+- Vergi optimizasyonu için öneriler (her vergi türü için spesifik; örneğin, KDV iadeleri, muafiyetler)
+- Operasyonel iyileştirmeler için tavsiyeler
 - Finansal riskleri azaltmaya yönelik kısa ve uzun vadeli öneriler
 
 # Yasal Uyumluluk
-- Şirketin beyanname verilerinin güncel vergi mevzuatına uygunluğu
+- Şirketin beyanname verilerinin Türkiye’nin güncel vergi mevzuatına uygunluğu (her beyanname türü için)
 - Potansiyel uyumsuzluklar veya dikkat edilmesi gereken alanlar
 - Uyumluluğu artırmak için önerilen düzeltici eylemler
 - Vergi denetimlerinde öne çıkabilecek riskli noktalar
 
 # Sonuç ve Değerlendirme
-- Analizin temel bulgularının özeti
-- Şirketin finansal sağlığı ve operasyonel performansı hakkında genel bir değerlendirme
-- Karar vericiler için actionable insights (örneğin, hangi alanlara yatırım yapılmalı)
-- Şirketin kısa vadeli ve uzun vadeli stratejik konumu
+- Analizin temel bulgularının özeti (tüm beyanname türleri dikkate alınarak)
+- Şirketin finansal sağlığı ve operasyonel performansı hakkında genel değerlendirme
+- Karar vericiler için actionable insights
+- Şirketin kısa ve uzun vadeli stratejik konumu
 
-# Sonraki Ayın Projeksiyonu
+# Sonraki Dönem Projeksiyonu
 ## Geçmiş Trendler
-- Eğer JSON verisinde farklı dönemlere ait belgeler varsa geçmiş trendlerin analizi (örneğin, işlem hacminde artış/azalış)
+- Farklı dönemlere ait veriler varsa trend analizi (örneğin, KDV’de artış, gelir vergisinde düşüş)
 - Tek dönemlik veri varsa genel bir değerlendirme
 ## Gelecek Senaryolar
-- Gelecek ay için olası finansal senaryolar (iyimser, kötümser, gerçekçi)
-- Stratejik odaklanılması gereken alanlar (örneğin, gider kontrolü, yeni sektörlere açılım)
+- Gelecek dönem için olası finansal senaryolar (iyimser, kötümser, gerçekçi)
+- Stratejik odaklanılması gereken alanlar (örneğin, vergi planlaması, gider kontrolü)
 
 JSON verisi:
 \`\`\`json
 ${JSON.stringify(json_data, null, 2)}
 \`\`\`
 
-Raporu mümkün olduğunca detaylı, profesyonel ve rehber bir şekilde hazırla. Her bölümde, verilere dayalı yorumlar yap, şirketin güçlü ve zayıf yönlerini vurgula ve uygulanabilir öneriler sun. Markdown formatını tutarlı bir şekilde kullan (ana başlıklar '#', alt başlıklar '##' ve '###', maddeler '-'), metni PDF çıktısına uygun hale getir ve görsel hiyerarşiyi destekle.
+Raporu mümkün olduğunca detaylı, profesyonel ve rehber bir şekilde hazırla. Verinin karışık yapısına uyum sağlayarak, tüm beyanname türlerini ve vergi yüklerini analiz et. Her bölümde, verilere dayalı yorumlar yap, şirketin güçlü ve zayıf yönlerini vurgula ve uygulanabilir öneriler sun. Markdown formatını tutarlı bir şekilde kullan (ana başlıklar '#', alt başlıklar '##' ve '###', maddeler '-'), metni PDF çıktısına uygun hale getir ve görsel hiyerarşiyi destekle.
 `;
 
     // Claude API isteği için timeout ekleme
     const claudeResponse = await Promise.race([
       anthropic.messages.create({
         model: "claude-3-7-sonnet-20250219",
-        max_tokens: 10192, // Daha uzun raporlar için yeterli
+        max_tokens: 20192,
         temperature: 0.2,
         system: systemInstructions,
         messages: [{ role: "user", content: userPrompt }],

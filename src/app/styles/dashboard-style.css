@@ -1,0 +1,421 @@
+/* dashboard-style.css */
+/* Montserrat fontları */
+@font-face {
+    font-family: "Montserrat";
+    src: url("/fonts/Montserrat-Black.ttf") format("truetype");
+    font-weight: 900;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Montserrat";
+    src: url("/fonts/Montserrat-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+}
+
+/* Genel gövde stilleri */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #000;
+    background-color: #f5f5f5;
+    box-sizing: border-box;
+}
+
+/* Ana kapsayıcı */
+.dashboard-container {
+    padding: 32px;
+    max-width: 1280px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background-color: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    position: relative; /* Modalın dashboard-container içinde kalması için */
+}
+
+/* Navbar */
+.navbar {
+    display: flex;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.nav-button {
+    background: transparent;
+    color: #000 !important;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-family: "Montserrat", sans-serif !important;
+    font-weight: 900 !important;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.nav-button:hover {
+    background-color: #f0f0f0;
+    color: #bd2f2c !important; /* Hoverda yazı rengi kırmızı, arka planla kontrastlı */
+}
+
+.nav-button.active {
+    background: #bd2f2c;
+    color: #fff !important; /* Aktif durumda yazı beyaz */
+}
+
+.logout-button {
+    background: #bd2f2c !important;
+    color: #fff !important;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-family: "Montserrat", sans-serif !important;
+    font-weight: 900 !important;
+    border: none !important;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+    background: #a52825 !important;
+    color: #fff !important; /* Hoverda yazı rengi beyaz */
+}
+
+/* Başlıklar */
+.page-title {
+    color: #000;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 400;
+    font-size: 36px;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.section-title {
+    color: #000;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 400;
+    font-size: 21px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    position: relative;
+}
+
+.section-title::after {
+    content: "";
+    display: block;
+    height: 4px;
+    width: 40px;
+    background-color: #bd2f2c;
+    margin-top: 10px;
+    border-radius: 2px;
+}
+
+/* Yükleniyor / Hata Mesajları */
+.loading-bar {
+    text-align: center;
+    padding: 12px;
+    background: #f0f0f0;
+    color: #000;
+    font-family: "Montserrat", sans-serif;
+    font-size: 16px;
+    margin-bottom: 24px;
+    border-radius: 3px;
+}
+
+.error-message {
+    text-align: center;
+    padding: 12px;
+    background: #f8d7da;
+    color: #721c24;
+    font-family: "Montserrat", sans-serif;
+    font-size: 16px;
+    margin-bottom: 24px;
+    border-radius: 3px;
+}
+
+.status-message {
+    text-align: center;
+    padding: 12px;
+    background: #d4edda;
+    color: #155724;
+    font-family: "Montserrat", sans-serif;
+    font-size: 16px;
+    margin-bottom: 24px;
+    border-radius: 3px;
+}
+
+/* Şirket Bilgisi Kartı */
+.company-card {
+    background: #fcfcfc;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.company-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.company-info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.company-info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 900;
+    font-size: 15px;
+    color: #333;
+}
+
+.info-value {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    color: #000;
+    text-align: right;
+}
+
+/* Scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #bd2f2c #e0e0e0;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #e0e0e0;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: #bd2f2c;
+    border-radius: 4px;
+}
+
+/* Modal Stilleri */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.preview-modal {
+    max-width: 800px;
+}
+
+.modal-title {
+    font-size: 21px;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 400;
+    color: #000;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+}
+
+.modal-title::after {
+    content: "";
+    display: block;
+    height: 4px;
+    width: 40px;
+    background-color: #bd2f2c;
+    margin-top: 10px;
+    border-radius: 2px;
+}
+
+/* Upload Dropzone */
+.upload-dropzone {
+    border: 2px dashed #e0e0e0;
+    padding: 20px;
+    text-align: center;
+    border-radius: 6px;
+    transition: border-color 0.3s ease;
+}
+
+.upload-dropzone.active {
+    border-color: #bd2f2c;
+}
+
+.dropzone-text {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+    font-family: "Montserrat", sans-serif;
+}
+
+.dropzone-label {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #bd2f2c;
+    color: #fff;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-top: 12px;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 900;
+    transition: background 0.2s ease;
+}
+
+.dropzone-label:hover {
+    background: #a52825;
+    color: #fff; /* Hoverda yazı rengi beyaz */
+}
+
+/* XML Preview */
+.xml-preview {
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+}
+
+/* Preview Buttons */
+.preview-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.preview-btn, .download-btn {
+    background: #bd2f2c;
+    color: #fff !important;
+    border: none;
+}
+
+.preview-btn:hover, .download-btn:hover {
+    background: #a52825;
+    color: #fff !important; /* Hoverda yazı rengi beyaz */
+}
+
+/* Table Header */
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.table-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.upload-button {
+    background: #bd2f2c;
+    color: #fff !important;
+    border: none;
+}
+
+.upload-button:hover {
+    background: #a52825;
+    color: #fff !important; /* Hoverda yazı rengi beyaz */
+}
+
+.bulk-download-button {
+    background: #bd2f2c;
+    color: #fff !important;
+    border: none;
+}
+
+.bulk-download-button:hover {
+    background: #a52825;
+    color: #fff !important; /* Hoverda yazı rengi beyaz */
+}
+
+.close-button {
+    background: #bd2f2c;
+    color: #fff !important;
+    border: none;
+}
+
+.close-button:hover {
+    background: #a52825;
+    color: #fff !important; /* Hoverda yazı rengi beyaz */
+}
+
+/* Responsive */
+@media only screen and (max-width: 768px) {
+    .navbar {
+        flex-wrap: wrap;
+    }
+    .nav-button {
+        margin-bottom: 8px;
+    }
+    .page-title {
+        font-size: 28px;
+    }
+    .company-card {
+        max-width: 100%;
+    }
+    .modal-content {
+        width: 95%;
+    }
+}
+
+@media only screen and (max-width: 480px) {
+    .page-title {
+        font-size: 24px;
+    }
+    .section-title {
+        font-size: 18px;
+    }
+    .company-info-row {
+        flex-direction: column;
+        text-align: left;
+    }
+    .info-value {
+        text-align: left;
+    }
+    .modal-title {
+        font-size: 18px;
+    }
+}
