@@ -8,6 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function POST(request) {
+  // 1) Auth Kontrolü
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Yetkisiz erişim" }), {
@@ -16,9 +17,12 @@ export async function POST(request) {
     });
   }
 
+  // 2) Supabase Client Oluştur
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
+
+  // 3) Aktif kullanıcı kontrolü
   const {
     data: { user },
     error: authError,
@@ -31,6 +35,7 @@ export async function POST(request) {
   }
 
   try {
+    // 4) Body parse
     const body = await request.json();
     const { unique_id, analysis_response } = body;
 
@@ -44,14 +49,14 @@ export async function POST(request) {
       );
     }
 
-    // Montserrat font yolları
+    // 5) Font dosyalarının yolu
     const fontDir = path.join(process.cwd(), "public", "fonts");
     const regularFontPath = path.join(fontDir, "Montserrat-Regular.ttf");
     const boldFontPath = path.join(fontDir, "Montserrat-Bold.ttf");
     const italicFontPath = path.join(fontDir, "Montserrat-Italic.ttf");
     const blackFontPath = path.join(fontDir, "Montserrat-Black.ttf");
 
-    // Fontların varlığını kontrol et
+    // 6) Fontların varlığını kontrol et
     try {
       await fs.access(regularFontPath);
       await fs.access(boldFontPath);
@@ -63,7 +68,7 @@ export async function POST(request) {
       );
     }
 
-    // PDF dokümanı oluştur
+    // 7) PDF oluşturma
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
@@ -77,12 +82,13 @@ export async function POST(request) {
     const montserratItalic = await pdfDoc.embedFont(italicFontBytes);
     const montserratBlack = await pdfDoc.embedFont(blackFontBytes);
 
-    let page = pdfDoc.addPage([595.28, 841.89]); // A4 boyutu
+    // A4 sayfa
+    let page = pdfDoc.addPage([595.28, 841.89]);
     const { width, height } = page.getSize();
     let yPosition = height - 50;
     const maxWidth = 500;
 
-    // Başlık (Sorgera kırmızısı)
+    // Başlık
     const title = "Sorgera Beyanname AI Analiz Raporu";
     const titleWidth = montserratBlack.widthOfTextAtSize(title, 16);
     page.drawText(title, {
@@ -90,30 +96,29 @@ export async function POST(request) {
       y: yPosition,
       size: 16,
       font: montserratBlack,
-      color: rgb(0.74, 0.18, 0.17), // Sorgera kırmızısı: #bd2f2c
+      color: rgb(0.74, 0.18, 0.17), // #bd2f2c
     });
     yPosition -= 40;
 
-    // Gövde içeriği (analysis_response)
+    // Metin işleme
     const rawLines = analysis_response.split("\n");
 
     for (let rawLine of rawLines) {
       let line = rawLine.trim();
       if (!line) {
-        yPosition -= 15; // Boş satır için boşluk
+        yPosition -= 15;
         continue;
       }
 
-      // Markdown temizliği
+      // Markdown karakterlerini temizle
       line = line
         .replace(/\*\*\*\*/g, "")
         .replace(/\*\*/g, "")
         .replace(/\*/g, "");
       if (/\|---/.test(line)) {
-        continue; // Tablo ayırıcı satırları atla
+        continue; // tablo ayırıcı satırları atla
       }
 
-      // Markdown’a göre stil belirleme
       let font = montserratRegular;
       let size = 10;
       let indent = 0;
@@ -140,7 +145,7 @@ export async function POST(request) {
         line = `• ${line.replace("- ", "")}`;
         indent = 30;
       } else {
-        font = montserratItalic; // Normal metin için italic
+        font = montserratItalic; // normal text -> italic
       }
 
       // Metni satırlara böl
@@ -160,6 +165,7 @@ export async function POST(request) {
       }
       if (currentLine) splitLines.push(currentLine);
 
+      // Yazdır
       for (const splitLine of splitLines) {
         if (yPosition < 50) {
           page = pdfDoc.addPage([595.28, 841.89]);
@@ -170,16 +176,24 @@ export async function POST(request) {
           y: yPosition,
           size,
           font,
-          color: rgb(0, 0, 0), // Her şey siyah
+          color: rgb(0, 0, 0),
         });
         yPosition -= size + 5;
       }
     }
 
-    // PDF’i byte array olarak kaydet
+    // 8) PDF'i byte array olarak kaydet
     const pdfBytes = await pdfDoc.save();
 
-    // Supabase Storage’a yükle
+    // 8a) PDF'i Base64'e dönüştür
+    const base64String = btoa(
+      new Uint8Array(pdfBytes).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+
+    // 9) Supabase Storage'a yükleme
     const fileName = `${unique_id}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from("analysis-pdfs")
@@ -193,15 +207,18 @@ export async function POST(request) {
       throw new Error(`PDF yükleme hatası: ${uploadError.message}`);
     }
 
-    // Public URL al
+    // 10) Public URL al
     const { data: publicUrl } = supabase.storage
       .from("analysis-pdfs")
       .getPublicUrl(fileName);
 
-    // PDF URL’sini güncelle
+    // 11) Tablodaki satırı güncelle (pdf_url ve pdf_base64 alanları)
     const { error: updateError } = await supabase
       .from("beyanname_analysis")
-      .update({ pdf_url: publicUrl.publicUrl })
+      .update({
+        pdf_url: publicUrl.publicUrl,
+        pdf_base64: base64String, // <--- Base64 burada saklanıyor
+      })
       .eq("unique_id", unique_id);
 
     if (updateError) {
@@ -209,8 +226,13 @@ export async function POST(request) {
       throw new Error(`PDF URL güncelleme hatası: ${updateError.message}`);
     }
 
+    // 12) İstek yanıtı: PDF URL + Base64
     return new Response(
-      JSON.stringify({ success: true, pdfUrl: publicUrl.publicUrl }),
+      JSON.stringify({
+        success: true,
+        pdfUrl: publicUrl.publicUrl,
+        pdfBase64: base64String,
+      }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },

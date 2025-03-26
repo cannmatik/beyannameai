@@ -9,3 +9,6 @@ entrypoint = "./functions/check-status/index.js"
 
 [functions.batch-analyze]
 entrypoint = "./functions/batch-analyze/index.js"
+
+[functions.get-pdf-base64]
+entrypoint = "./functions/get-pdf-base64/index.js"
