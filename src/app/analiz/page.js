@@ -14,6 +14,7 @@ import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorIcon from "@mui/icons-material/Error";
 import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // Kopyala ikonu
 
 const Typewriter = ({ texts, speed = 100, delay = 2000 }) => {
   const [displayText, setDisplayText] = useState("");
@@ -106,7 +107,7 @@ export default function AnalizPage() {
     const combined = queueData.map((queueItem) => {
       const analysisItem = analysisData?.find((a) => a.unique_id === queueItem.unique_id);
       return {
-        id: queueItem.id,
+        id: analysisItem?.id || queueItem.id, // `beyanname_analysis` tablosunun `id` değerini al, yoksa `queueItem.id`
         unique_id: queueItem.unique_id,
         status: queueItem.status,
         created_at: queueItem.created_at,
@@ -185,6 +186,7 @@ export default function AnalizPage() {
 
   const generatePdf = async (uniqueId, analysisResponse) => {
     setLoading(true);
+    setSnackbar({ open: true, message: "PDF oluşturuluyor, lütfen bekleyin...", severity: "info" });
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Oturum bulunamadı");
@@ -228,7 +230,26 @@ export default function AnalizPage() {
   ];
 
   const combinedCols = [
-    { field: "unique_id", headerName: "ID", width: 220 },
+    {
+      field: "id",
+      headerName: "Analiz ID",
+      width: 220,
+      renderCell: ({ value }) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <IconButton
+            size="small"
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              setSnackbar({ open: true, message: "ID kopyalandı!", severity: "success" });
+            }}
+            sx={{ color: "#bd2f2c", "&:hover": { color: "#a12825" } }}
+          >
+            <ContentCopyIcon fontSize="small" />
+          </IconButton>
+          <Typography>{value}</Typography>
+        </Box>
+      ),
+    },
     {
       field: "status",
       headerName: "Durum",
