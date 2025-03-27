@@ -22,25 +22,15 @@ export default function FileManagement() {
   const [dragActive, setDragActive] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
         return;
       }
-
-      const { data: adminData, error: adminError } = await supabase
-        .from("admin")
-        .select("id")
-        .eq("id", user.id)
-        .single();
-      setIsAdmin(!!adminData && !adminError);
 
       await fetchFiles(user.id);
       setLoading(false);
@@ -369,26 +359,22 @@ export default function FileManagement() {
             DOSYA YÖNETİMİ
           </button>
         </Link>
-        {isAdmin && (
-          <>
-            <Link href="/dashboard/prompts">
-              <button
-                className={`nav-button ${
-                  pathname === "/dashboard/prompts" ? "active" : ""
-                }`}
-              >
-                PROMPT YÖNETİMİ
-              </button>
-            </Link>
-            <Link href="/admin">
-              <button
-                className={`nav-button ${pathname === "/admin" ? "active" : ""}`}
-              >
-                ADMİN PANEL
-              </button>
-            </Link>
-          </>
-        )}
+        <Link href="/dashboard/prompts">
+          <button
+            className={`nav-button ${
+              pathname === "/dashboard/prompts" ? "active" : ""
+            }`}
+          >
+            PROMPT YÖNETİMİ
+          </button>
+        </Link>
+        <Link href="/admin">
+          <button
+            className={`nav-button ${pathname === "/admin" ? "active" : ""}`}
+          >
+            ADMİN PANEL
+          </button>
+        </Link>
         <button onClick={handleLogout} className="logout-button">
           Çıkış Yap
         </button>

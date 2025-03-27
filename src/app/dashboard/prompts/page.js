@@ -3,41 +3,24 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // Kendi supabase client import yolunuz
+import { supabase } from "@/lib/supabase";
 import "@/app/styles/dashboard-style.css";
 import { DataGrid } from "@mui/x-data-grid";
-import {
-  Button,
-  Box,
-  TextField,
-  Select,
-  MenuItem
-} from "@mui/material";
+import { Button, Box, TextField, Select, MenuItem } from "@mui/material";
 
 export default function PromptsPage() {
   const router = useRouter();
   const pathname = usePathname();
-
   const [prompts, setPrompts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [newPrompt, setNewPrompt] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isAdmin, setIsAdmin] = useState(null);
 
-  // MUI tabloda göstereceğimiz kolonlar
   const columns = [
-    {
-      field: "id",
-      headerName: "ID",
-      width: 100,
-    },
-    {
-      field: "company_id",
-      headerName: "Şirket ID",
-      flex: 1,
-    },
+    { field: "id", headerName: "ID", width: 100 },
+    { field: "company_id", headerName: "Şirket ID", flex: 1 },
     {
       field: "prompt",
       headerName: "Prompt (Özet)",
@@ -67,54 +50,36 @@ export default function PromptsPage() {
   ];
 
   useEffect(() => {
-    checkAdminAndFetchData();
-  }, []);
+    const fetchData = async () => {
+      setLoading(true);
 
-  const checkAdminAndFetchData = async () => {
-    setLoading(true);
+      // Kullanıcı kontrolü
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("admin")
-      .select("id")
-      .eq("id", user.id)
-      .single();
-
-    if (adminError || !adminData) {
-      setIsAdmin(false);
-      setLoading(false);
-    } else {
-      setIsAdmin(true);
+      // Prompt ve şirket verilerini çek
       await fetchPrompts();
       await fetchCompanies();
       setLoading(false);
-    }
-  };
+    };
+    fetchData();
+  }, [router]);
 
   const fetchPrompts = async () => {
     try {
       setError("");
       setLoading(true);
-
       const { data, error } = await supabase
         .from("prompts")
-        .select("*") // Tüm sütunları çekiyoruz
+        .select("*")
         .order("id", { ascending: true });
-
       if (error) throw error;
-
-      console.log("Çekilen veri:", data); // Veriyi kontrol etmek için
       setPrompts(data || []);
     } catch (err) {
       setError(err.message);
-      console.error("Hata:", err);
     } finally {
       setLoading(false);
     }
@@ -145,12 +110,10 @@ export default function PromptsPage() {
     try {
       setLoading(true);
       setError("");
-
       const { error } = await supabase
         .from("prompts")
         .insert([{ company_id: selectedCompany, prompt: newPrompt }]);
       if (error) throw error;
-
       setNewPrompt("");
       setSelectedCompany("");
       await fetchPrompts();
@@ -166,13 +129,11 @@ export default function PromptsPage() {
     try {
       setLoading(true);
       setError("");
-
       const { error } = await supabase
         .from("prompts")
         .delete()
         .eq("id", id);
       if (error) throw error;
-
       await fetchPrompts();
     } catch (err) {
       setError(err.message);
@@ -185,36 +146,6 @@ export default function PromptsPage() {
     await supabase.auth.signOut();
     router.push("/login");
   };
-
-  if (isAdmin === null) {
-    return (
-      <Box className="dashboard-container">
-        <div className="loading-bar">⏳ Yetki kontrolü yapılıyor...</div>
-      </Box>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <Box className="dashboard-container">
-        <Box className="navbar">
-          <Link href="/dashboard" className="nav-button">
-            Kontrol Paneli
-          </Link>
-          <Button
-            onClick={handleLogout}
-            className="logout-button"
-            variant="contained"
-          >
-            Çıkış Yap
-          </Button>
-        </Box>
-        <div className="error-message">
-          ⚠️ Yetkisiz Erişim: Bu sayfaya erişim yetkiniz yok.
-        </div>
-      </Box>
-    );
-  }
 
   return (
     <Box className="dashboard-container">
@@ -258,10 +189,7 @@ export default function PromptsPage() {
       {/* Yeni Prompt Ekleme Formu */}
       <Box sx={{ marginBottom: "32px" }}>
         <h2 className="section-title">Yeni Prompt Ekle</h2>
-        <form
-          onSubmit={handleAddPrompt}
-          style={{ display: "flex", flexDirection: "column", maxWidth: 400 }}
-        >
+        <form onSubmit={handleAddPrompt} style={{ display: "flex", flexDirection: "column", maxWidth: 400 }}>
           <Select
             value={selectedCompany}
             onChange={(e) => setSelectedCompany(e.target.value)}
@@ -277,7 +205,6 @@ export default function PromptsPage() {
               </MenuItem>
             ))}
           </Select>
-
           <TextField
             multiline
             rows={4}
@@ -286,12 +213,7 @@ export default function PromptsPage() {
             placeholder="Prompt içeriğini girin..."
             sx={{ marginBottom: 2 }}
           />
-
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={loading}
-          >
+          <Button type="submit" variant="contained" disabled={loading}>
             Ekle
           </Button>
         </form>
