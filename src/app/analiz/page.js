@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogActions,
+  DialogTitle,
   IconButton,
   CircularProgress,
 } from "@mui/material";
@@ -26,6 +27,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 /* Daktilo Efektli Başlık Bileşeni */
 const Typewriter = ({ texts, speed = 100, delay = 2000 }) => {
@@ -81,6 +83,9 @@ export default function AnalizPage() {
   const [pdfProgressDialog, setPdfProgressDialog] = useState(false);
   const [pdfProgress, setPdfProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
+  const [beyannameDialogOpen, setBeyannameDialogOpen] = useState(false);
+  const [selectedBeyannameIds, setSelectedBeyannameIds] = useState([]);
+  const [beyannameDetails, setBeyannameDetails] = useState([]);
 
   const analyzeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/queue-analyze`;
   const checkStatusUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-status`;
@@ -115,7 +120,7 @@ export default function AnalizPage() {
       .select("*")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false })
-      .limit(10); // İlk 10 kaydı çekiyoruz
+      .limit(10);
 
     if (queueError) {
       console.error("fetchQueue error:", queueError);
@@ -132,7 +137,7 @@ export default function AnalizPage() {
       .select("*")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false })
-      .limit(10); // İlk 10 kaydı çekiyoruz
+      .limit(10);
 
     if (analysisError) {
       console.error("fetchAnalysis error:", analysisError);
@@ -149,6 +154,7 @@ export default function AnalizPage() {
         created_at: queueItem.created_at,
         analysis_response: analysisItem?.analysis_response || null,
         pdf_url: analysisItem?.pdf_url || null,
+        beyanname_ids: analysisItem?.beyanname_ids || queueItem.beyanname_ids,
       };
     });
     setCombinedItems(combined || []);
@@ -362,6 +368,31 @@ export default function AnalizPage() {
     setPopupContent("");
   };
 
+  const handleBeyannameDetailsOpen = async (beyannameIds) => {
+    try {
+      const { data, error } = await supabase
+        .from("beyanname")
+        .select("id, firma_adi, vergi_no, donem_yil, donem_ay, beyanname_turu, json_data") // id eklendi
+        .in("id", beyannameIds);
+      if (error) throw error;
+      setSelectedBeyannameIds(beyannameIds);
+      setBeyannameDetails(data || []);
+      setBeyannameDialogOpen(true);
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: `Beyanname detayları çekilemedi: ${err.message}`,
+        severity: "error",
+      });
+    }
+  };
+
+  const handleBeyannameDialogClose = () => {
+    setBeyannameDialogOpen(false);
+    setSelectedBeyannameIds([]);
+    setBeyannameDetails([]);
+  };
+
   const beyannameCols = [
     { field: "firma_adi", headerName: "Firma", flex: 1 },
     { field: "vergi_no", headerName: "Vergi No", flex: 1 },
@@ -426,6 +457,23 @@ export default function AnalizPage() {
       headerName: "Tarih",
       width: 160,
       renderCell: ({ value }) => new Date(value).toLocaleString("tr-TR"),
+    },
+    {
+      field: "beyanname_ids",
+      headerName: "Kullanılan Beyannameler",
+      width: 200,
+      renderCell: ({ value }) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography>{value.length} Beyanname</Typography>
+          <IconButton
+            size="small"
+            onClick={() => handleBeyannameDetailsOpen(value)}
+            sx={{ color: "#bd2f2c", "&:hover": { color: "#a12825" } }}
+          >
+            <VisibilityIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ),
     },
     {
       field: "analysis_response",
@@ -511,8 +559,7 @@ export default function AnalizPage() {
       <Box sx={{ textAlign: "center", mt: 2, mb: 4 }}>
         <Typewriter texts={typewriterTexts} speed={100} delay={2000} />
         <Typography variant="subtitle1" sx={{ color: "#666", mt: 1 }}>
-          Finansal verilerinizi yapay zekâ ile hızlıca çözün, stratejik kararlar
-          alın.
+          Finansal verilerinizi yapay zekâ ile hızlıca çözün, stratejik kararlar alın.
         </Typography>
       </Box>
 
@@ -543,7 +590,6 @@ export default function AnalizPage() {
           <Typography variant="h6" sx={{ mb: 2 }}>
             PDF Oluşturuluyor...
           </Typography>
-
           <Box sx={{ position: "relative", display: "inline-flex" }}>
             <CircularProgress
               variant="determinate"
@@ -571,7 +617,6 @@ export default function AnalizPage() {
               >{`${Math.round(pdfProgress)}%`}</Typography>
             </Box>
           </Box>
-
           <Typography variant="body2" sx={{ color: "#666", mt: 2 }}>
             {progressMessage}
           </Typography>
@@ -615,6 +660,40 @@ export default function AnalizPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={beyannameDialogOpen}
+        onClose={handleBeyannameDialogClose}
+        maxWidth="md"
+        fullWidth
+        sx={{
+          "& .MuiDialog-paper": {
+            borderRadius: 2,
+            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
+            border: "1px solid #bd2f2c",
+          },
+        }}
+      >
+        <DialogTitle>Kullanılan Beyannameler</DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <DataGrid
+            rows={beyannameDetails}
+            columns={beyannameCols}
+            getRowId={(row) => row.id} // Benzersiz id için getRowId zaten tanımlı
+            autoHeight
+            disableSelectionOnClick
+            localeText={{
+              footerRowPerPage: "Sayfadaki Satır:",
+              footerTotalRows: "Toplam Kayıt:",
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleBeyannameDialogClose} sx={{ color: "#bd2f2c" }}>
+            Kapat
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Typography variant="h6" className="section-title" sx={{ mt: 2 }}>
         Beyannameler
       </Typography>
@@ -649,9 +728,7 @@ export default function AnalizPage() {
           "&:hover": { backgroundColor: "#a12825" },
         }}
       >
-        {loading
-          ? "Yükleniyor..."
-          : `Analize Gönder (${selectedFiles.length})`}
+        {loading ? "Yükleniyor..." : `Analize Gönder (${selectedFiles.length})`}
       </Button>
 
       <Typography variant="h6" className="section-title" sx={{ mt: 4 }}>
@@ -665,12 +742,8 @@ export default function AnalizPage() {
           className="data-table"
           disableRowSelectionOnClick
           initialState={{
-            pagination: {
-              paginationModel: { pageSize: 10, page: 0 },
-            },
-            sorting: {
-              sortModel: [{ field: "created_at", sort: "desc" }],
-            },
+            pagination: { paginationModel: { pageSize: 10, page: 0 } },
+            sorting: { sortModel: [{ field: "created_at", sort: "desc" }] },
           }}
           pageSizeOptions={[10]}
           pagination

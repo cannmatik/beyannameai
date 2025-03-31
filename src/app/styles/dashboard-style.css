@@ -188,7 +188,7 @@ body {
     border-bottom: 1px solid #e0e0e0;
 }
 
-.MuiDataCampusGrid-row.Mui-selected {
+.MuiDataGrid-row.Mui-selected {
     background-color: #f5f5f5 !important;
     transition: background-color 0.2s ease;
 }
@@ -207,6 +207,7 @@ body {
     border-radius: 3px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
+    min-width: 80px; /* Buton genişliği için minimum değer */
 }
 
 .MuiButton-containedPrimary {
@@ -265,53 +266,10 @@ body {
 }
 
 /* Modal Stilleri */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: #fff;
-    padding: 24px;
+.MuiDialog-paper {
+    border: 1px solid #bd2f2c;
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    max-width: 600px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
-    border: 1px solid #bd2f2c;
-}
-
-.preview-modal {
-    max-width: 800px;
-}
-
-.modal-title {
-    font-size: 21px;
-    font-family: "Montserrat", sans-serif;
-    font-weight: 400;
-    color: #000;
-    margin-bottom: 16px;
-    text-transform: uppercase;
-}
-
-.modal-title::after {
-    content: "";
-    display: block;
-    height: 4px;
-    width: 40px;
-    background-color: #bd2f2c;
-    margin-top: 10px;
-    border-radius: 2px;
 }
 
 /* Upload Dropzone */
@@ -439,7 +397,7 @@ body {
     .company-card {
         max-width: 100%;
     }
-    .modal-content {
+    .MuiDialog-paper {
         width: 95%;
     }
     .table-header {
@@ -466,8 +424,8 @@ body {
     .info-value {
         text-align: left;
     }
-    .modal-title {
-        font-size: 18px;
+    .MuiDialog-paper {
+        width: 90%;
     }
     .preview-btn,
     .download-btn,

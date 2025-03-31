@@ -41,109 +41,83 @@ serve(async (req) => {
       .update({ status: "processing", updated_at: new Date().toISOString() })
       .eq("unique_id", unique_id);
 
+    // user_id ile company_info’dan company_id’yi çek
+    const { data: companyData, error: companyError } = await supabase
+      .from("company_info")
+      .select("id")
+      .eq("user_id", user_id)
+      .single();
+
+    if (companyError) {
+      console.warn("company_info’dan company_id çekilemedi:", companyError.message);
+      throw new Error("Şirket bilgisi bulunamadı.");
+    }
+
+    const companyId = companyData?.id || null;
+    if (!companyId) {
+      console.warn("company_id bulunamadı, default prompt kullanılacak.");
+    }
+
+    // Şirkete özel prompt’u çek (is_custom: true)
+    let systemInstructions, userPrompt, model, maxTokens, usedPrompt;
+
+    if (companyId) {
+      const { data: customPromptData, error: customPromptError } = await supabase
+        .from("prompts")
+        .select("system_instructions, prompt, model, max_tokens")
+        .eq("company_id", companyId)
+        .eq("is_custom", true)
+        .single();
+
+      if (customPromptError && customPromptError.code !== "PGRST116") {
+        throw new Error("Custom prompt verisi çekilemedi: " + customPromptError.message);
+      }
+
+      if (customPromptData) {
+        systemInstructions = customPromptData.system_instructions;
+        userPrompt = customPromptData.prompt.text; // jsonb olduğu için .text
+        model = customPromptData.model;
+        maxTokens = customPromptData.max_tokens;
+        usedPrompt = customPromptData.prompt; // Tam jsonb objesini kaydediyoruz
+      }
+    }
+
+    // Şirkete özel prompt bulunamazsa default prompt’u çek
+    if (!systemInstructions) {
+      const { data: defaultPromptData, error: defaultPromptError } = await supabase
+        .from("prompts")
+        .select("system_instructions, prompt, model, max_tokens")
+        .eq("company_id", 9999)
+        .eq("is_custom", false)
+        .single();
+
+      if (defaultPromptError) {
+        throw new Error("Default prompt verisi çekilemedi: " + defaultPromptError.message);
+      }
+
+      systemInstructions = defaultPromptData.system_instructions;
+      userPrompt = defaultPromptData.prompt.text; // jsonb olduğu için .text
+      model = defaultPromptData.model;
+      maxTokens = defaultPromptData.max_tokens;
+      usedPrompt = defaultPromptData.prompt; // Tam jsonb objesini kaydediyoruz
+    }
+
     const anthropic = new Anthropic({ apiKey: claudeApiKey });
-    const systemInstructions = `
-Sen, finansal analiz ve vergi danışmanlığı alanında uzun yıllara dayanan deneyime sahip, uzman bir profesyonelsin. Mali beyanname verilerini (farklı türlerde ve karışık yapıda olabilir) en ince ayrıntısına kadar analiz eder, şirketlerin finansal sağlıklarını, performanslarını ve vergi yükümlülüklerini değerlendirirsin. Analizlerin, yalnızca sayısal verilere dayanmakla kalmaz, aynı zamanda stratejik içgörüler ve uygulanabilir öneriler sunar. Finansal kavramları sade, anlaşılır bir dille ifade eder ve Türkiye’nin güncel vergi mevzuatına tam uyum sağlarsın. Şirketlerin vergi optimizasyonu için yaratıcı çözümler önerirsin.
 
-Raporlarını, profesyonel bir üslupla ve yapılandırılmış bir şekilde, **Markdown** formatında hazırlarsın. Ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' kullanırsın. Metin tabanlı açıklamalar ve listeler kullanarak, tablolardan tamamen kaçınırsın (çünkü rapor PDF’e çevrilecek). Analizlerin, şirketin karar vericilerine rehber olacak kadar detaylı ve kapsamlıdır.
-`;
+    // JSON verisini prompt’a yerleştir
+    const finalUserPrompt = userPrompt.replace("{{JSON_DATA}}", JSON.stringify(json_data, null, 2));
 
-    const userPrompt = `
-Aşağıdaki JSON formatındaki mali beyanname verilerini analiz ederek, şirketin finansal durumu hakkında **son derece kapsamlı ve detaylı bir Finansal Analiz Raporu** oluştur. JSON verisi, tek bir beyanname türünden veya birden fazla farklı beyanname türünden (örneğin, damga vergisi, KDV, gelir vergisi, kurumlar vergisi vb.) oluşabilir ve karışık bir yapıda olabilir. Raporu **Markdown** formatında hazırla; ana başlıklar için '#', alt başlıklar için '##' ve '###', maddeler için '-' formatını kullan. Tablo kullanmaktan kaçın; bunun yerine metin tabanlı açıklamalar ve listeler kullan, çünkü rapor PDF formatında sunulacak.
-
-Raporu şu bölümlerle yapılandır ve her birinde verilere dayalı derinlemesine yorumlar, içgörüler ve stratejik öneriler sun. Verinin yapısına göre esnek bir şekilde analiz yap; yalnızca damga vergisine odaklanmak zorunda değilsin, tüm beyanname türlerini ve ilgili vergi yüklerini dikkate al:
-
-# Şirket Bilgileri
-- Şirketin tam unvanı (yasal adı, veriden çıkarılabilirse)
-- Vergi kimlik numarası (varsa)
-- Kayıtlı adres (il, ilçe, açık adres; veriden çıkarılabilirse)
-- İletişim bilgileri (telefon numarası, e-posta adresi; veriden çıkarılabilirse)
-- Analizin kapsadığı dönem (örneğin, 2023 Q1, tam yıl veya birden fazla dönem)
-- Şirketin faaliyet gösterdiği ana sektör veya sektörler (veriden tahmin edilerek)
-
-# Finansal Özet
-- Toplam gelir (dönem bazında, tüm beyanname türlerinden elde edilen gelirler)
-- Toplam gider (kategorilere göre özet; örneğin, personel giderleri, operasyonel giderler)
-- Net kar veya zarar (tüm beyanname verileri dikkate alınarak)
-- Toplam işlem tutarı (beyannamelerdeki tüm işlemlerin toplamı)
-- Toplam vergi yükü (damga vergisi, KDV, gelir vergisi vb. tüm vergi türleri ayrı ayrı ve toplamda)
-- Ortalama vergi oranı (toplam vergi / toplam işlem tutarı; her vergi türü için ayrı ayrı hesaplanabilir)
-- Diğer dikkat çeken finansal metrikler (örneğin, işlem başına ortalama tutar, gider/gelir oranı)
-
-# İşlem Analizi
-## İşlem Sayıları ve Türleri
-- Toplam işlem sayısı (tüm beyanname türleri dahil)
-- Belge türlerine göre dağılım (örneğin, faturalar, makbuzlar, sözleşmeler, beyanname türleri)
-- Farklı beyanname türlerinin işlem sayısına etkisi (örneğin, KDV beyannameleri daha yoğun mu?)
-## İşlem Hacmi Dağılımı
-- İşlem hacminin aylık, çeyreklik veya beyanname türüne göre dağılımı
-- İşlem yoğunluğunda dikkat çeken patternler veya anormallikler (örneğin, belirli bir vergi döneminde ani artış)
-- Ortalama işlem tutarı ve istatistiksel bilgiler (standart sapma gibi)
-
-# Önemli İşlemler
-- En yüksek tutarlı 5 işlem için (tüm beyanname türlerinden):
-  - İşlem tarihi
-  - İşlem açıklaması (kısa ve net; beyanname türüyle ilişkilendirilerek)
-  - İşlem tutarı
-  - Ödenen vergi miktarı (ilgili vergi türü belirtilerek)
-- Bu işlemlerin şirketin finansal durumu üzerindeki etkisi
-- Önemli işlemlerin stratejik açıdan değerlendirilmesi (örneğin, büyük bir KDV iadesi mi, yüksek bir kurumlar vergisi mi?)
-
-# Sektörel Dağılım
-- İşlemlerin sektörlere göre dağılımı (veriden tahmin edilerek; örneğin, teknoloji, inşaat)
-- Her bir sektördeki işlem hacmi ve vergi yükü (farklı vergi türleri dikkate alınarak)
-- Şirketin sektörel çeşitlendirme durumu hakkında yorumlar
-- Sektörel riskler veya fırsatlar üzerine değerlendirme
-
-# Risk ve Öneriler
-## Potansiyel Riskler
-- Yüksek vergi yükü (her vergi türü için ayrı ayrı analiz)
-- Belirli sektörlere veya beyanname türlerine aşırı bağımlılık
-- İşlem yoğunluğunda dengesizlik veya mevzuata uyumsuzluk riskleri
-## Stratejik Öneriler
-- Vergi optimizasyonu için öneriler (her vergi türü için spesifik; örneğin, KDV iadeleri, muafiyetler)
-- Operasyonel iyileştirmeler için tavsiyeler
-- Finansal riskleri azaltmaya yönelik kısa ve uzun vadeli öneriler
-
-# Yasal Uyumluluk
-- Şirketin beyanname verilerinin Türkiye’nin güncel vergi mevzuatına uygunluğu (her beyanname türü için)
-- Potansiyel uyumsuzluklar veya dikkat edilmesi gereken alanlar
-- Uyumluluğu artırmak için önerilen düzeltici eylemler
-- Vergi denetimlerinde öne çıkabilecek riskli noktalar
-
-# Sonuç ve Değerlendirme
-- Analizin temel bulgularının özeti (tüm beyanname türleri dikkate alınarak)
-- Şirketin finansal sağlığı ve operasyonel performansı hakkında genel değerlendirme
-- Karar vericiler için actionable insights
-- Şirketin kısa ve uzun vadeli stratejik konumu
-
-# Sonraki Dönem Projeksiyonu
-## Geçmiş Trendler
-- Farklı dönemlere ait veriler varsa trend analizi (örneğin, KDV’de artış, gelir vergisinde düşüş)
-- Tek dönemlik veri varsa genel bir değerlendirme
-## Gelecek Senaryolar
-- Gelecek dönem için olası finansal senaryolar (iyimser, kötümser, gerçekçi)
-- Stratejik odaklanılması gereken alanlar (örneğin, vergi planlaması, gider kontrolü)
-
-JSON verisi:
-\`\`\`json
-${JSON.stringify(json_data, null, 2)}
-\`\`\`
-
-Raporu mümkün olduğunca detaylı, profesyonel ve rehber bir şekilde hazırla. Verinin karışık yapısına uyum sağlayarak, tüm beyanname türlerini ve vergi yüklerini analiz et. Her bölümde, verilere dayalı yorumlar yap, şirketin güçlü ve zayıf yönlerini vurgula ve uygulanabilir öneriler sun. Markdown formatını tutarlı bir şekilde kullan (ana başlıklar '#', alt başlıklar '##' ve '###', maddeler '-'), metni PDF çıktısına uygun hale getir ve görsel hiyerarşiyi destekle.
-`;
-
-    // Claude API isteği için timeout ekleme
+    // Claude API isteği
     const claudeResponse = await Promise.race([
       anthropic.messages.create({
-        model: "claude-3-7-sonnet-20250219",
-        max_tokens: 20192,
+        model: model,
+        max_tokens: maxTokens,
         temperature: 0.2,
         system: systemInstructions,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [{ role: "user", content: finalUserPrompt }],
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Claude API isteği zaman aşımına uğradı")), 120000) // 2 dakika timeout
+        setTimeout(() => reject(new Error("Claude API isteği zaman aşımına uğradı")), 120000)
       ),
     ]);
 
@@ -156,12 +130,14 @@ Raporu mümkün olduğunca detaylı, profesyonel ve rehber bir şekilde hazırla
       .update({ status: "completed", updated_at: new Date().toISOString() })
       .eq("unique_id", unique_id);
 
-    // Analiz sonucunu kaydet
+    // Analiz sonucunu kaydet (yeni sütunlarla birlikte)
     await supabase.from("beyanname_analysis").insert({
       unique_id,
       user_id,
       beyanname_ids,
       analysis_response: analysisText,
+      used_prompt: usedPrompt, // Kullanılan prompt (jsonb)
+      input_data: json_data,   // Gönderilen input (jsonb)
       pdf_url: null,
       created_at: new Date().toISOString(),
     });
@@ -176,7 +152,6 @@ Raporu mümkün olduğunca detaylı, profesyonel ve rehber bir şekilde hazırla
   } catch (error) {
     console.error("Error in process-analyze:", error.message);
 
-    // Hata durumunda "failed" olarak güncelle
     if (body?.unique_id) {
       await supabase
         .from("analysis_queue")
