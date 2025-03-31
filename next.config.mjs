@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
-
-export default nextConfig;
+const nextConfig = {
+    // Ekstra yapılandırma gerekirse buraya eklenebilir
+  };
+  
+  export default nextConfig;

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import "@/app/styles/dashboard-style.css";
 import { DataGrid } from "@mui/x-data-grid";
@@ -10,7 +9,6 @@ import { Button, Box, TextField, Select, MenuItem } from "@mui/material";
 
 export default function PromptsPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const [prompts, setPrompts] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [newPrompt, setNewPrompt] = useState("");
@@ -54,7 +52,9 @@ export default function PromptsPage() {
       setLoading(true);
 
       // Kullanıcı kontrolü
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
         return;
@@ -129,10 +129,7 @@ export default function PromptsPage() {
     try {
       setLoading(true);
       setError("");
-      const { error } = await supabase
-        .from("prompts")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("prompts").delete().eq("id", id);
       if (error) throw error;
       await fetchPrompts();
     } catch (err) {
@@ -142,44 +139,10 @@ export default function PromptsPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
   return (
     <Box className="dashboard-container">
-      {/* Navbar */}
-      <Box className="navbar">
-        <Link href="/dashboard">
-          <Button className={`nav-button ${pathname === "/dashboard" ? "active" : ""}`}>
-            Kontrol Paneli
-          </Button>
-        </Link>
-        <Link href="/analiz">
-          <Button className={`nav-button ${pathname === "/analiz" ? "active" : ""}`}>
-            Analiz
-          </Button>
-        </Link>
-        <Link href="/dashboard/file-management">
-          <Button className={`nav-button ${pathname === "/dashboard/file-management" ? "active" : ""}`}>
-            Dosya Yönetimi
-          </Button>
-        </Link>
-        <Link href="/dashboard/prompts">
-          <Button className={`nav-button ${pathname === "/dashboard/prompts" ? "active" : ""}`}>
-            Prompt Yönetimi
-          </Button>
-        </Link>
-        <Link href="/admin">
-          <Button className={`nav-button ${pathname === "/admin" ? "active" : ""}`}>
-            Admin Panel
-          </Button>
-        </Link>
-        <Button onClick={handleLogout} className="logout-button">
-          Çıkış Yap
-        </Button>
-      </Box>
+      {/* Navbar kodu bu sayfadan kaldırıldı. 
+          Artık global layout veya ayrı Navbar bileşeninde olmalı. */}
 
       {loading && <div className="loading-bar">⏳ Yükleniyor...</div>}
       {error && <div className="error-message">⚠️ {error}</div>}
@@ -189,7 +152,10 @@ export default function PromptsPage() {
       {/* Yeni Prompt Ekleme Formu */}
       <Box sx={{ marginBottom: "32px" }}>
         <h2 className="section-title">Yeni Prompt Ekle</h2>
-        <form onSubmit={handleAddPrompt} style={{ display: "flex", flexDirection: "column", maxWidth: 400 }}>
+        <form
+          onSubmit={handleAddPrompt}
+          style={{ display: "flex", flexDirection: "column", maxWidth: 400 }}
+        >
           <Select
             value={selectedCompany}
             onChange={(e) => setSelectedCompany(e.target.value)}

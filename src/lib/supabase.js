@@ -1,4 +1,3 @@
-// src/app/lib/supabase.js
 import { createClient } from '@supabase/supabase-js';
 
 // Ortam değişkenlerini al
@@ -18,9 +17,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Supabase istemcisini oluştur
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: true, // Token otomatik yenileme
-    persistSession: true, // Oturumu yerel depolamada sakla
-    detectSessionInUrl: true, // URL'deki oturum bilgilerini algıla (örneğin, OAuth sonrası)
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
   },
 });
 
@@ -29,7 +28,7 @@ if (process.env.NODE_ENV === "development") {
   console.log("Supabase istemcisi başarıyla oluşturuldu:", supabaseUrl);
 }
 
-// Oturum durumunu izlemek için bir yardımcı fonksiyon (isteğe bağlı)
+// Oturum durumunu izlemek için bir yardımcı fonksiyon
 export const getSession = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
@@ -44,13 +43,28 @@ export const getSession = async () => {
   }
 };
 
-// Oturum değişikliklerini izlemek için bir olay dinleyicisi (isteğe bağlı)
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === "TOKEN_REFRESHED") {
-    console.log("Token yenilendi:", session?.access_token?.slice(0, 10) + "...");
-  } else if (event === "SIGNED_IN") {
-    console.log("Kullanıcı oturum açtı:", session?.user?.id);
-  } else if (event === "SIGNED_OUT") {
-    console.log("Kullanıcı oturumu kapattı.");
+// Kullanıcının admin olup olmadığını kontrol eden fonksiyon
+export const checkAdmin = async () => {
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("Kullanıcı alınamadı:", userError?.message);
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from("admin")
+      .select("id")
+      .eq("id", user.id);
+
+    if (error) {
+      console.error("Admin kontrol hatası:", error.message);
+      return false;
+    }
+
+    return data.length > 0; // Kullanıcı admin tablosundaysa true döner
+  } catch (err) {
+    console.error("checkAdmin hatası:", err);
+    return false;
   }
-});
+};

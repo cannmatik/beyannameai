@@ -4,6 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  InputAdornment,
+  IconButton,
+} from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -39,34 +47,49 @@ export default function LoginPage() {
           {error && <div className="error-message">{error}</div>}
 
           <form onSubmit={handleLogin}>
-            <input
+            <TextField
               type="email"
-              className="form-input"
+              variant="outlined"
               placeholder="E-posta"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              fullWidth
+              className="form-input"
+              sx={{ mb: 2 }}
             />
-            <div className="password-container">
-              <input
-                type={showPassword ? "text" : "password"}
-                className="form-input"
-                placeholder="Şifre"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button
-                type="button"
-                className="toggle-password"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <VisibilityOff /> : <Visibility />}
-              </button>
-            </div>
-            <button type="submit" className="form-button">
+            <TextField
+              type={showPassword ? "text" : "password"}
+              variant="outlined"
+              placeholder="Şifre"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              fullWidth
+              className="form-input"
+              sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      sx={{ color: "#bd2f2c" }}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              className="form-button"
+            >
               Giriş
-            </button>
+            </Button>
           </form>
 
           <p className="auth-text">

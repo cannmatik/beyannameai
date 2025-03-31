@@ -1,15 +1,19 @@
+// app/dashboard/page.js
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  Box,
+  Button,
+  Typography,
+  TextField,
+} from "@mui/material";
 import "@/app/styles/dashboard-style.css";
-import { Button, Box, Typography, TextField } from "@mui/material";
 
 export default function Dashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [companyData, setCompanyData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +25,6 @@ export default function Dashboard() {
     const fetchData = async () => {
       setLoading(true);
 
-      // Kullanıcı kontrolü
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
@@ -29,7 +32,6 @@ export default function Dashboard() {
       }
       setUser(user);
 
-      // Firma bilgisi kontrolü
       const { data, error } = await supabase
         .from("company_info")
         .select("id, user_id, firma_adi, vergi_no, created_at, firma_sektor")
@@ -41,20 +43,15 @@ export default function Dashboard() {
         setError("Firma bilgisi alınırken hata oluştu: " + error.message);
         setShowPopup(true);
       } else if (!data) {
-        setShowPopup(true); // Kayıt yoksa popup göster
+        setShowPopup(true);
       } else {
-        setCompanyData(data); // Kayıt varsa state'e set et
+        setCompanyData(data);
       }
       setLoading(false);
     };
 
     fetchData();
   }, [router]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
 
   const handleFileChange = (e) => {
     const uploadedFile = e.target.files?.[0];
@@ -128,48 +125,8 @@ export default function Dashboard() {
     }
   };
 
-  const restrictNavigation = (path) => {
-    if (!companyData && path !== "/dashboard") {
-      setError("Önce bir beyanname (XML) yüklemelisiniz!");
-      return false;
-    }
-    return true;
-  };
-
   return (
     <Box className="dashboard-container">
-      {/* Navbar */}
-      <Box className="navbar">
-        <Link href="/dashboard">
-          <Button className={`nav-button ${pathname === "/dashboard" ? "active" : ""}`}>
-            Kontrol Paneli
-          </Button>
-        </Link>
-        <Link href="/analiz" onClick={(e) => !restrictNavigation("/analiz") && e.preventDefault()}>
-          <Button className={`nav-button ${pathname === "/analiz" ? "active" : ""}`} disabled={!companyData}>
-            Analiz
-          </Button>
-        </Link>
-        <Link href="/dashboard/file-management" onClick={(e) => !restrictNavigation("/dashboard/file-management") && e.preventDefault()}>
-          <Button className={`nav-button ${pathname === "/dashboard/file-management" ? "active" : ""}`} disabled={!companyData}>
-            Dosya Yönetimi
-          </Button>
-        </Link>
-        <Link href="/dashboard/prompts" onClick={(e) => !restrictNavigation("/dashboard/prompts") && e.preventDefault()}>
-          <Button className={`nav-button ${pathname === "/dashboard/prompts" ? "active" : ""}`} disabled={!companyData}>
-            Prompt Düzenle
-          </Button>
-        </Link>
-        <Link href="/admin" onClick={(e) => !restrictNavigation("/admin") && e.preventDefault()}>
-          <Button className={`nav-button ${pathname === "/admin" ? "active" : ""}`} disabled={!companyData}>
-            Admin Yönetimi
-          </Button>
-        </Link>
-        <Button onClick={handleLogout} className="logout-button">
-          Çıkış Yap
-        </Button>
-      </Box>
-
       {loading && <div className="loading-bar">⏳ Yükleniyor...</div>}
       {error && <div className="error-message">⚠️ {error}</div>}
 
@@ -180,14 +137,18 @@ export default function Dashboard() {
           <div className="error-message">
             Firma bilgisi bulunamadı. Lütfen bir beyanname (XML) yükleyin.
           </div>
-          <Box sx={{ marginTop: "16px" }}>
+          <Box sx={{ marginTop: "16px", display: "flex", gap: 2 }}>
             <TextField
               type="file"
               inputProps={{ accept: ".xml" }}
               onChange={handleFileChange}
-              sx={{ marginRight: "16px" }}
+              sx={{ flex: 1 }}
             />
-            <Button variant="contained" onClick={handleFileUpload} disabled={!file || loading}>
+            <Button
+              variant="contained"
+              onClick={handleFileUpload}
+              disabled={!file || loading}
+            >
               Dosyayı Yükle
             </Button>
           </Box>

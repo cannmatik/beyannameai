@@ -1,12 +1,14 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./src/app/**/*.{js,ts,jsx,tsx}",
-    "./src/lib/**/*.{js,ts,jsx,tsx}",
-    // "./src/components/**/*.{js,ts,jsx,tsx,mdx}", eğer components varsa
+    "./app/**/*.{js,ts,jsx,tsx}", // app dizinindeki tüm JS/TS dosyaları
+    "./components/**/*.{js,ts,jsx,tsx}", // components dizinindeki dosyalar
+    "./lib/**/*.{js,ts,jsx,tsx}", // lib dizinindeki dosyalar
   ],
   theme: {
-    extend: {},
+    extend: {
+      // İsteğe bağlı: Özel Tailwind teması eklemek istersen buraya yazabilirsin
+    },
   },
   plugins: [],
 };

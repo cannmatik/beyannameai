@@ -1,8 +1,8 @@
+// app/dashboard/file-management/page.js
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { XMLParser, XMLBuilder } from "fast-xml-parser";
 import { DataGrid } from "@mui/x-data-grid";
@@ -11,7 +11,6 @@ import "@/app/styles/dashboard-style.css";
 
 export default function FileManagement() {
   const router = useRouter();
-  const pathname = usePathname();
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewFile, setPreviewFile] = useState(null);
@@ -248,11 +247,6 @@ export default function FileManagement() {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
   const columns = [
     {
       field: "firma_adi",
@@ -336,50 +330,6 @@ export default function FileManagement() {
 
   return (
     <div className="dashboard-container">
-      {/* Navbar */}
-      <div className="navbar">
-        <Link href="/dashboard">
-          <button
-            className={`nav-button ${pathname === "/dashboard" ? "active" : ""}`}
-          >
-            KONTROL PANELİ
-          </button>
-        </Link>
-        <Link href="/analiz">
-          <button className={`nav-button ${pathname === "/analiz" ? "active" : ""}`}>
-            ANALİZ
-          </button>
-        </Link>
-        <Link href="/dashboard/file-management">
-          <button
-            className={`nav-button ${
-              pathname === "/dashboard/file-management" ? "active" : ""
-            }`}
-          >
-            DOSYA YÖNETİMİ
-          </button>
-        </Link>
-        <Link href="/dashboard/prompts">
-          <button
-            className={`nav-button ${
-              pathname === "/dashboard/prompts" ? "active" : ""
-            }`}
-          >
-            PROMPT YÖNETİMİ
-          </button>
-        </Link>
-        <Link href="/admin">
-          <button
-            className={`nav-button ${pathname === "/admin" ? "active" : ""}`}
-          >
-            ADMİN PANEL
-          </button>
-        </Link>
-        <button onClick={handleLogout} className="logout-button">
-          Çıkış Yap
-        </button>
-      </div>
-
       {loading && <div className="loading-bar">⏳ {status || "Yükleniyor..."}</div>}
       {error && <div className="error-message">⚠️ {error}</div>}
       {status && !loading && <div className="status-message">{status}</div>}

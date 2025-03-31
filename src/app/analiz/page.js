@@ -82,7 +82,6 @@ export default function AnalizPage() {
   const [pdfProgress, setPdfProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
 
-  // Bu URL'ler .env.* dosyalarınızdan geliyor
   const analyzeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/queue-analyze`;
   const checkStatusUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-status`;
   const generatePdfUrl = "/api/generate-pdf";
@@ -99,7 +98,6 @@ export default function AnalizPage() {
     } = await supabase.auth.getSession();
     if (!session) return;
 
-    // 1) Beyannameler
     const { data: beyannameData, error: beyannameError } = await supabase
       .from("beyanname")
       .select("*")
@@ -112,12 +110,13 @@ export default function AnalizPage() {
     }
     setFiles(beyannameData || []);
 
-    // 2) Analiz kuyruğu
     const { data: queueData, error: queueError } = await supabase
       .from("analysis_queue")
       .select("*")
       .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(10); // İlk 10 kaydı çekiyoruz
+
     if (queueError) {
       console.error("fetchQueue error:", queueError);
       setSnackbar({
@@ -128,17 +127,17 @@ export default function AnalizPage() {
       return;
     }
 
-    // 3) Analizler
     const { data: analysisData, error: analysisError } = await supabase
       .from("beyanname_analysis")
       .select("*")
       .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(10); // İlk 10 kaydı çekiyoruz
+
     if (analysisError) {
       console.error("fetchAnalysis error:", analysisError);
     }
 
-    // 4) Kuyruk ile analiz tablosunu birleştir
     const combined = queueData.map((queueItem) => {
       const analysisItem = analysisData?.find(
         (a) => a.unique_id === queueItem.unique_id
@@ -273,7 +272,6 @@ export default function AnalizPage() {
 
       const payload = { unique_id: uniqueId, analysis_response: analysisResponse };
 
-      // /api/generate-pdf endpoint'ine istek atıyoruz
       const response = await fetch(generatePdfUrl, {
         method: "POST",
         headers: {
@@ -286,7 +284,6 @@ export default function AnalizPage() {
       if (!response.ok)
         throw new Error(`PDF oluşturma isteği başarısız: ${response.statusText}`);
 
-      // Streaming response'u satır satır okuyoruz
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let accumulatedData = "";
@@ -298,15 +295,13 @@ export default function AnalizPage() {
         const chunk = decoder.decode(value, { stream: true });
         accumulatedData += chunk;
 
-        // \n bazlı ayır
         const lines = accumulatedData.split("\n");
-        accumulatedData = lines.pop(); // son satır yarım kalmış olabilir
+        accumulatedData = lines.pop();
 
         for (const line of lines) {
           if (!line.trim()) continue;
 
           if (line.startsWith("progress:")) {
-            // Örnek: progress: 57 message: Metin işleniyor...
             const progressMatch = line.match(/progress:\s*(\d+)/);
             const messageMatch = line.match(/message:\s*(.+)/);
 
@@ -318,7 +313,6 @@ export default function AnalizPage() {
             setPdfProgress(progress);
             setProgressMessage(message);
           } else if (line.startsWith("data:")) {
-            // Örnek: data: { "success": true, "pdfUrl": "..."}
             const jsonString = line.replace("data:", "").trim();
             try {
               const result = JSON.parse(jsonString);
@@ -336,7 +330,6 @@ export default function AnalizPage() {
               throw new Error("Sunucudan gelen veri hatalı formatta.");
             }
           } else if (line.startsWith("error:")) {
-            // Örnek: error: Bir hata oluştu...
             const errorMsg = line.replace("error:", "").trim();
             setSnackbar({
               open: true,
@@ -355,7 +348,6 @@ export default function AnalizPage() {
       });
     } finally {
       setLoading(false);
-      // Biraz gecikmeli kapatalım ki %100 değerini gösterme şansımız olsun
       setTimeout(() => setPdfProgressDialog(false), 800);
     }
   };
@@ -516,20 +508,6 @@ export default function AnalizPage() {
 
   return (
     <Box className="analiz-container">
-      {/* Navbar */}
-      <Box className="navbar">
-        <Link href="/dashboard">
-          <Button className="nav-button">Kontrol Paneli</Button>
-        </Link>
-        <Link href="/analiz">
-          <Button className="nav-button active">Analiz</Button>
-        </Link>
-        <Link href="/dashboard/file-management">
-          <Button className="nav-button">Dosya Yönetimi</Button>
-        </Link>
-      </Box>
-
-      {/* Daktilo Efektli Başlık */}
       <Box sx={{ textAlign: "center", mt: 2, mb: 4 }}>
         <Typewriter texts={typewriterTexts} speed={100} delay={2000} />
         <Typography variant="subtitle1" sx={{ color: "#666", mt: 1 }}>
@@ -549,7 +527,6 @@ export default function AnalizPage() {
         </Alert>
       </Snackbar>
 
-      {/* PDF İlerleme Popup */}
       <Dialog
         open={pdfProgressDialog}
         maxWidth="sm"
@@ -567,7 +544,6 @@ export default function AnalizPage() {
             PDF Oluşturuluyor...
           </Typography>
 
-          {/* MUI CircularProgress (Determinate) */}
           <Box sx={{ position: "relative", display: "inline-flex" }}>
             <CircularProgress
               variant="determinate"
@@ -611,7 +587,6 @@ export default function AnalizPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Analiz Özeti Popup */}
       <Dialog
         open={openPopup}
         onClose={handlePopupClose}
@@ -689,7 +664,15 @@ export default function AnalizPage() {
           getRowId={(row) => row.id}
           className="data-table"
           disableRowSelectionOnClick
-          pageSizeOptions={[10, 25, 50, 100]}
+          initialState={{
+            pagination: {
+              paginationModel: { pageSize: 10, page: 0 },
+            },
+            sorting: {
+              sortModel: [{ field: "created_at", sort: "desc" }],
+            },
+          }}
+          pageSizeOptions={[10]}
           pagination
           localeText={{
             footerRowPerPage: "Sayfadaki Analiz:",

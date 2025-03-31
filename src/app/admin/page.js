@@ -148,14 +148,6 @@ export default function AdminPage() {
   if (!isAdmin) {
     return (
       <Box className="dashboard-container">
-        <Box className="navbar">
-          <Link href="/dashboard">
-            <Button className="nav-button">Kontrol Paneli</Button>
-          </Link>
-          <Button onClick={handleLogout} className="logout-button">
-            Çıkış Yap
-          </Button>
-        </Box>
         <div className="error-message">⚠️ Yetkisiz Erişim: Bu sayfaya erişim yetkiniz yok.</div>
       </Box>
     );
@@ -163,38 +155,6 @@ export default function AdminPage() {
 
   return (
     <Box className="dashboard-container">
-      {/* Navbar */}
-      <Box className="navbar">
-        <Link href="/dashboard">
-          <Button className={`nav-button ${pathname === "/dashboard" ? "active" : ""}`}>
-            Kontrol Paneli
-          </Button>
-        </Link>
-        <Link href="/analiz">
-          <Button className={`nav-button ${pathname === "/analiz" ? "active" : ""}`}>
-            Analiz
-          </Button>
-        </Link>
-        <Link href="/dashboard/file-management">
-          <Button className={`nav-button ${pathname === "/dashboard/file-management" ? "active" : ""}`}>
-            Dosya Yönetimi
-          </Button>
-        </Link>
-        <Link href="/dashboard/prompts">
-          <Button className={`nav-button ${pathname === "/dashboard/prompts" ? "active" : ""}`}>
-            Prompt Yönetimi
-          </Button>
-        </Link>
-        <Link href="/admin">
-          <Button className={`nav-button ${pathname === "/admin" ? "active" : ""}`}>
-            Admin Panel
-          </Button>
-        </Link>
-        <Button onClick={handleLogout} className="logout-button">
-          Çıkış Yap
-        </Button>
-      </Box>
-
       {loading && <div className="loading-bar">⏳ Yükleniyor...</div>}
       {error && <div className="error-message">⚠️ {error}</div>}
 
