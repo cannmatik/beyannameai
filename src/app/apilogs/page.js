@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -12,6 +11,7 @@ import {
   IconButton,
   Chip,
   Typography,
+  TextField,
 } from "@mui/material";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
@@ -24,6 +24,17 @@ export default function BeyannameApiLogsPage() {
   const [openModal, setOpenModal] = useState(false);
   const [modalContent, setModalContent] = useState("");
   const [modalTitle, setModalTitle] = useState("");
+
+  // Yeni: toplam kayıt sayısı ve limit
+  const [totalCount, setTotalCount] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [fetchLimit, setFetchLimit] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("beyannameFetchLimit");
+      return saved ? parseInt(saved, 10) || 500 : 500; // default 500
+    }
+    return 500;
+  });
 
   // Filtre ve sıralama için localStorage
   const [gridState, setGridState] = useState(() => {
@@ -43,52 +54,70 @@ export default function BeyannameApiLogsPage() {
     [logs]
   );
   const uniqueDirections = useMemo(
-    () => Array.from(new Set(logs.map((l) => l.direction).filter(Boolean))).sort(),
+    () =>
+      Array.from(new Set(logs.map((l) => l.direction).filter(Boolean))).sort(),
     [logs]
   );
 
-  useEffect(() => {
-    const fetchLogs = async () => {
+  // Logları çeken fonksiyon (limit kontrollü)
+  const fetchLogs = useCallback(
+    async (limit = fetchLimit) => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error, count } = await supabase
           .from("beyanname_api_logs")
-          .select("*")
+          // Not: count: "estimated" performans için iyidir. Tam sayı istersen "exact" kullan.
+          .select("*", { count: "estimated" })
           .order("id", { ascending: false })
-          .limit(500);
+          .limit(limit);
+
         if (error) throw error;
         setLogs(data ?? []);
+        setTotalCount(count ?? 0);
+        setLastUpdated(new Date());
+        // Seçim kalıcı olsun
+        if (typeof window !== "undefined") {
+          localStorage.setItem("beyannameFetchLimit", String(limit));
+        }
       } catch (err) {
-        setError(err.message || String(err));
+        setError(err?.message ?? String(err));
       } finally {
         setLoading(false);
       }
-    };
-    fetchLogs();
+    },
+    [fetchLimit]
+  );
 
+  // İlk yükleme + subscription
+  useEffect(() => {
+    fetchLogs(); // initial
     const channel = supabase
       .channel("beyanname_api_logs-changes")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "beyanname_api_logs" },
-        fetchLogs
+        () => fetchLogs()
       )
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, []);
+  }, [fetchLogs]);
 
-  // Grid state'i kaydet - DEĞİŞTİRİLDİ
+  // Limit değişince oto çekmek istersen aşağıyı aç.
+  // useEffect(() => {
+  //   fetchLogs();
+  // }, [fetchLimit, fetchLogs]);
+
+  // Grid state'i kaydet
   useEffect(() => {
     if (gridState) {
       localStorage.setItem("beyannameGridState", JSON.stringify(gridState));
     }
   }, [gridState]);
 
-  // useCallback ile optimize edilmiş state güncelleme fonksiyonu - YENİ EKLENDİ
+  // Grid state değişimini optimize et
   const handleGridStateChange = useCallback((newState) => {
-    // Sadece gerçekten değişen state'i güncelle
-    setGridState(prevState => {
+    setGridState((prevState) => {
       if (JSON.stringify(prevState) === JSON.stringify(newState)) {
         return prevState; // Aynıysa güncelleme yapma
       }
@@ -106,7 +135,6 @@ export default function BeyannameApiLogsPage() {
     setModalTitle(title);
     setOpenModal(true);
   };
-
   const closeModal = () => {
     setOpenModal(false);
     setModalContent("");
@@ -201,11 +229,48 @@ export default function BeyannameApiLogsPage() {
         </Typography>
       )}
 
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold", p: 2 }}>
-        📜 Beyanname API Logs
+      <Typography variant="h5" sx={{ mb: 1.5, fontWeight: "bold", p: 2, pb: 1 }}>
+        🧾 Beyanname API Logs
       </Typography>
 
-      <Box sx={{ height: "85vh", width: "100%" }}>
+      {/* Üst Kontrol Şeridi: Limit seçimi + butonlar + sayım */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: 2,
+          alignItems: "center",
+          flexWrap: "wrap",
+          px: 2,
+          pb: 1.5,
+        }}
+      >
+        <TextField
+          label="Çekilecek kayıt sayısı"
+          type="number"
+          size="small"
+          value={fetchLimit}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setFetchLimit(Number.isFinite(v) ? Math.max(1, Math.floor(v)) : 1);
+          }}
+          inputProps={{ min: 1, step: 50 }}
+        />
+        <Button variant="contained" onClick={() => fetchLogs(fetchLimit)}>
+          Güncelle
+        </Button>
+        <Button variant="outlined" onClick={() => fetchLogs()}>
+          Yenile
+        </Button>
+
+        <Typography variant="body2" sx={{ ml: "auto" }}>
+          Toplam: {totalCount ?? "—"} | Gösterilen: {logs.length}
+          {lastUpdated
+            ? ` | Son güncelleme: ${lastUpdated.toLocaleString("tr-TR")}`
+            : ""}
+        </Typography>
+      </Box>
+
+      <Box sx={{ height: "80vh", width: "100%" }}>
         <DataGrid
           rows={logs}
           columns={columns}
@@ -223,13 +288,18 @@ export default function BeyannameApiLogsPage() {
             toolbarDensity: "Yoğunluk",
             toolbarExport: "Dışa Aktar",
           }}
-          initialState={gridState || {
-            pagination: { paginationModel: { page: 0, pageSize: 10 } },
-            sorting: { sortModel: [{ field: "timestamp", sort: "desc" }] },
-          }}
-          onStateChange={handleGridStateChange} // DEĞİŞTİRİLDİ
+          initialState={
+            gridState || {
+              pagination: { paginationModel: { page: 0, pageSize: 10 } },
+              sorting: { sortModel: [{ field: "timestamp", sort: "desc" }] },
+            }
+          }
+          onStateChange={handleGridStateChange}
           sx={{
-            "& .MuiDataGrid-toolbarContainer": { justifyContent: "flex-end", color: "#800020" },
+            "& .MuiDataGrid-toolbarContainer": {
+              justifyContent: "flex-end",
+              color: "#800020",
+            },
             "& .MuiDataGrid-columnHeaders": { bgcolor: "#f5f5f5", fontWeight: "bold" },
             "& .MuiDataGrid-cell": { fontSize: "0.875rem" },
             "& .MuiDataGrid-virtualScroller": { overflowX: "hidden" },
