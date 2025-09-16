@@ -78,7 +78,7 @@ export default function HomePage() {
       </main>
       <footer className="footer">
         <p>
-          Made by Can Matik &copy; Sorgera Yazılım Teknolojileri A.Ş.
+         Beyanname.net &copy; Sorgera Yazılım Teknolojileri A.Ş.
         </p>
       </footer>
     </div>

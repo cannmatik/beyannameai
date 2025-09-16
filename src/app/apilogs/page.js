@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Box,
@@ -13,7 +13,7 @@ import {
   Chip,
   Typography,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
@@ -25,7 +25,45 @@ export default function BeyannameApiLogsPage() {
   const [modalContent, setModalContent] = useState("");
   const [modalTitle, setModalTitle] = useState("");
 
+  // Filtre ve sıralama için localStorage
+  const [gridState, setGridState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("beyannameGridState");
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+
+  const uniqueVKNs = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.vkn).filter(Boolean))).sort(),
+    [logs]
+  );
+  const uniqueMethods = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.method).filter(Boolean))).sort(),
+    [logs]
+  );
+  const uniqueDirections = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.direction).filter(Boolean))).sort(),
+    [logs]
+  );
+
   useEffect(() => {
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("beyanname_api_logs")
+          .select("*")
+          .order("id", { ascending: false })
+          .limit(500);
+        if (error) throw error;
+        setLogs(data ?? []);
+      } catch (err) {
+        setError(err.message || String(err));
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchLogs();
 
     const channel = supabase
@@ -33,54 +71,37 @@ export default function BeyannameApiLogsPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "beyanname_api_logs" },
-        () => fetchLogs()
+        fetchLogs
       )
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const fetchLogs = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("beyanname_api_logs")
-        .select("*")
-        .order("id", { ascending: false }) // id her zaman artar
-        .limit(500);
-      if (error) throw error;
-
-      const processedData = data.map((row) => {
-        let formattedTimestamp = "";
-        try {
-          if (row.timestamp) {
-            const date = new Date(row.timestamp);
-          if (!isNaN(date.getTime())) {
-            // +3 saat ekle
-            date.setHours(date.getHours() + 3);
-            formattedTimestamp = date.toLocaleString("tr-TR");
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing timestamp:", row.timestamp, e);
-        }
-        return { ...row, formattedTimestamp };
-      });
-
-      setLogs(processedData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Grid state'i kaydet - DEĞİŞTİRİLDİ
+  useEffect(() => {
+    if (gridState) {
+      localStorage.setItem("beyannameGridState", JSON.stringify(gridState));
     }
-  };
+  }, [gridState]);
+
+  // useCallback ile optimize edilmiş state güncelleme fonksiyonu - YENİ EKLENDİ
+  const handleGridStateChange = useCallback((newState) => {
+    // Sadece gerçekten değişen state'i güncelle
+    setGridState(prevState => {
+      if (JSON.stringify(prevState) === JSON.stringify(newState)) {
+        return prevState; // Aynıysa güncelleme yapma
+      }
+      return newState;
+    });
+  }, []);
 
   const openRawContentModal = (content, title) => {
     try {
       const formatted = JSON.stringify(JSON.parse(content), null, 2);
       setModalContent(formatted);
     } catch {
-      setModalContent(content);
+      setModalContent(content ?? "");
     }
     setModalTitle(title);
     setOpenModal(true);
@@ -92,47 +113,26 @@ export default function BeyannameApiLogsPage() {
     setModalTitle("");
   };
 
-  // Tarih filtreleme için özel operator
-  const dateFilterOperators = [
-    {
-      label: "Eşittir",
-      value: "equals",
-      getApplyFilterFn: (filterItem) => {
-        if (!filterItem.value) return null;
-        return (params) => {
-          const cellDate = new Date(params.value);
-          const filterDate = new Date(filterItem.value);
-          return (
-            cellDate.toDateString() === filterDate.toDateString()
-          );
-        };
-      },
-      InputComponent: (props) => (
-        <input
-          type="date"
-          value={props.item.value || ""}
-          onChange={(e) => props.applyValue({ ...props.item, value: e.target.value })}
-          style={{ padding: "4px", fontSize: "0.9rem" }}
-        />
-      ),
-    },
-  ];
-
   const columns = [
     { field: "id", headerName: "ID", width: 90 },
-    { field: "uuid", headerName: "UUID", width: 180 },
-    { field: "vkn", headerName: "VKN", width: 120 },
+    { field: "uuid", headerName: "UUID", width: 200 },
+    {
+      field: "vkn",
+      headerName: "VKN",
+      width: 120,
+      type: "singleSelect",
+      valueOptions: uniqueVKNs,
+    },
     {
       field: "direction",
-      headerName: "Direction",
+      headerName: "Durum",
       width: 120,
+      type: "singleSelect",
+      valueOptions: uniqueDirections,
       renderCell: (params) => {
-        if (!params || !params.value)
-          return <Chip label="Unknown" size="small" sx={{ fontWeight: "bold" }} />;
-        const value = params.value;
+        const value = params.value ?? "Unknown";
         let color = "default";
         let variant = "outlined";
-
         if (value === "success") {
           color = "success";
           variant = "filled";
@@ -140,7 +140,6 @@ export default function BeyannameApiLogsPage() {
           color = "error";
           variant = "filled";
         }
-
         return (
           <Chip
             label={value}
@@ -152,53 +151,57 @@ export default function BeyannameApiLogsPage() {
         );
       },
     },
-    { field: "method", headerName: "Method", width: 100 },
     {
-      field: "url",
-      headerName: "URL",
-      width: 200,
-      renderCell: (params) => (
-        <Box sx={{ wordBreak: "break-all" }}>{params.value}</Box>
-      ),
+      field: "method",
+      headerName: "Method",
+      width: 120,
+      type: "singleSelect",
+      valueOptions: uniqueMethods,
     },
+    { field: "url", headerName: "URL", width: 250 },
     { field: "env", headerName: "Env", width: 100 },
     {
-      field: "formattedTimestamp",
-      headerName: "Timestamp",
-      width: 200,
-      filterOperators: dateFilterOperators, // özel tarih filtresi
+      field: "timestamp",
+      headerName: "Tarih",
+      width: 180,
+      renderCell: (params) => {
+        if (!params.value) return "";
+        const date = new Date(params.value);
+        date.setHours(date.getHours() + 3); // UTC +3 Türkiye
+        return date.toLocaleString("tr-TR");
+      },
     },
     {
       field: "raw_content",
-      headerName: "Raw Content",
-      width: 120,
+      headerName: "Detay",
+      width: 100,
       sortable: false,
       filterable: false,
       renderCell: (params) => (
         <IconButton
-          size="small"
           onClick={() =>
             openRawContentModal(
               params.row.raw_content,
-              `Raw Log - UUID: ${params.row.uuid || "Unknown"}`
+              `Log Detayı - UUID: ${params.row.uuid ?? "Unknown"}`
             )
           }
         >
-          <VisibilityIcon />
+          <VisibilityIcon sx={{ color: "#800020" }} />
         </IconButton>
       ),
     },
   ];
 
   return (
-    <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#fff" }}>
-      {loading && <Typography>⏳ Yükleniyor...</Typography>}
-      {error && <Typography color="error">⚠️ {error}</Typography>}
+    <Box sx={{ width: "100%", height: "100vh", bgcolor: "#fff", overflow: "hidden" }}>
+      {loading && <Typography sx={{ p: 2 }}>⏳ Yükleniyor...</Typography>}
+      {error && (
+        <Typography color="error" sx={{ p: 2 }}>
+          ⚠️ {error}
+        </Typography>
+      )}
 
-      <Typography
-        variant="h5"
-        sx={{ mb: 2, fontWeight: "bold", p: 2 }}
-      >
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold", p: 2 }}>
         📜 Beyanname API Logs
       </Typography>
 
@@ -207,24 +210,34 @@ export default function BeyannameApiLogsPage() {
           rows={logs}
           columns={columns}
           getRowId={(row) => row.id}
-          initialState={{
-            pagination: { paginationModel: { page: 0, pageSize: 10 } },
-          }}
-          pageSizeOptions={[5, 10, 25]}
+          loading={loading}
+          pageSizeOptions={[5, 10, 25, 50]}
           disableRowSelectionOnClick
-          sortingOrder={["asc", "desc"]}
+          slots={{ toolbar: GridToolbar }}
+          slotProps={{ toolbar: { showQuickFilter: true } }}
+          sortingMode="client"
           filterMode="client"
+          localeText={{
+            toolbarColumns: "Sütunlar",
+            toolbarFilters: "Filtreler",
+            toolbarDensity: "Yoğunluk",
+            toolbarExport: "Dışa Aktar",
+          }}
+          initialState={gridState || {
+            pagination: { paginationModel: { page: 0, pageSize: 10 } },
+            sorting: { sortModel: [{ field: "timestamp", sort: "desc" }] },
+          }}
+          onStateChange={handleGridStateChange} // DEĞİŞTİRİLDİ
           sx={{
-            "& .MuiDataGrid-columnHeaders": {
-              bgcolor: "#f5f5f5",
-              fontWeight: "bold",
-            },
+            "& .MuiDataGrid-toolbarContainer": { justifyContent: "flex-end", color: "#800020" },
+            "& .MuiDataGrid-columnHeaders": { bgcolor: "#f5f5f5", fontWeight: "bold" },
             "& .MuiDataGrid-cell": { fontSize: "0.875rem" },
+            "& .MuiDataGrid-virtualScroller": { overflowX: "hidden" },
+            "& .MuiButtonBase-root": { color: "#800020" },
           }}
         />
       </Box>
 
-      {/* Modal */}
       <Dialog open={openModal} onClose={closeModal} maxWidth="lg" fullWidth>
         <DialogTitle>
           {modalTitle}
@@ -258,4 +271,3 @@ export default function BeyannameApiLogsPage() {
     </Box>
   );
 }
-  
