@@ -3,8 +3,8 @@ import AuthCheck from "@/components/AuthCheck";
 
 export const metadata = {
   title: {
-    default: "Analyse Easy",
-    template: "Analyse Easy - %s",
+    default: "Sorgera Beyanname AI",
+    template: "Sorgera Beyanname AI - %s",
   },
   icons: {
     icon: "/favicon.ico?v=1",

@@ -7,7 +7,7 @@ import "@/app/styles/homepage.css";
 
 export default function HomePage() {
   const messages = [
-    "Sorgera Beyanname AI ile Vergi Analizinizi Kolaylaştırın",
+    "Sorgera Beyanname Çözümleri ile Vergi Analizinizi Kolaylaştırın",
     "Beyannamelerinizi Hızlıca Yükleyin ve Analiz Edin",
     "Finansal Verilerinizi Akıllıca Yönetin",
     "Vergi Süreçlerinizi Otomatize Edin",

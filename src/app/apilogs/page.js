@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 export default function BeyannameApiLogsPage() {
   const [logs, setLogs] = useState([]);
@@ -45,26 +46,20 @@ export default function BeyannameApiLogsPage() {
       const { data, error } = await supabase
         .from("beyanname_api_logs")
         .select("*")
-        .order("timestamp", { ascending: false, nullsLast: true })
+        .order("id", { ascending: false }) // id her zaman artar
         .limit(500);
-
       if (error) throw error;
 
-      // Timestamp kontrolü ve hata yönetimi
       const processedData = data.map((row) => {
         let formattedTimestamp = "";
         try {
           if (row.timestamp) {
             const date = new Date(row.timestamp);
-            if (!isNaN(date.getTime())) {
-              formattedTimestamp = date.toLocaleString("tr-TR", {
-                timeZone: "UTC",
-              });
-            } else {
-              console.warn("Invalid timestamp:", row.timestamp, row);
+          if (!isNaN(date.getTime())) {
+            // +3 saat ekle
+            date.setHours(date.getHours() + 3);
+            formattedTimestamp = date.toLocaleString("tr-TR");
             }
-          } else {
-            console.warn("Missing timestamp:", row);
           }
         } catch (e) {
           console.error("Error parsing timestamp:", row.timestamp, e);
@@ -72,12 +67,9 @@ export default function BeyannameApiLogsPage() {
         return { ...row, formattedTimestamp };
       });
 
-      console.log("Processed logs:", processedData);
-
       setLogs(processedData);
     } catch (err) {
       setError(err.message);
-      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -100,16 +92,40 @@ export default function BeyannameApiLogsPage() {
     setModalTitle("");
   };
 
+  // Tarih filtreleme için özel operator
+  const dateFilterOperators = [
+    {
+      label: "Eşittir",
+      value: "equals",
+      getApplyFilterFn: (filterItem) => {
+        if (!filterItem.value) return null;
+        return (params) => {
+          const cellDate = new Date(params.value);
+          const filterDate = new Date(filterItem.value);
+          return (
+            cellDate.toDateString() === filterDate.toDateString()
+          );
+        };
+      },
+      InputComponent: (props) => (
+        <input
+          type="date"
+          value={props.item.value || ""}
+          onChange={(e) => props.applyValue({ ...props.item, value: e.target.value })}
+          style={{ padding: "4px", fontSize: "0.9rem" }}
+        />
+      ),
+    },
+  ];
+
   const columns = [
-    { field: "id", headerName: "ID", width: 90, type: "number", filterable: true },
-    { field: "uuid", headerName: "UUID", width: 180, type: "string", filterable: true },
-    { field: "vkn", headerName: "VKN", width: 120, type: "string", filterable: true },
+    { field: "id", headerName: "ID", width: 90 },
+    { field: "uuid", headerName: "UUID", width: 180 },
+    { field: "vkn", headerName: "VKN", width: 120 },
     {
       field: "direction",
       headerName: "Direction",
       width: 120,
-      type: "string",
-      filterable: true,
       renderCell: (params) => {
         if (!params || !params.value)
           return <Chip label="Unknown" size="small" sx={{ fontWeight: "bold" }} />;
@@ -125,62 +141,68 @@ export default function BeyannameApiLogsPage() {
           variant = "filled";
         }
 
-        return <Chip label={value} color={color} variant={variant} size="small" sx={{ fontWeight: "bold" }} />;
+        return (
+          <Chip
+            label={value}
+            color={color}
+            variant={variant}
+            size="small"
+            sx={{ fontWeight: "bold" }}
+          />
+        );
       },
     },
-    { field: "method", headerName: "Method", width: 100, type: "string", filterable: true },
+    { field: "method", headerName: "Method", width: 100 },
     {
       field: "url",
       headerName: "URL",
       width: 200,
-      type: "string",
-      filterable: true,
-      renderCell: (params) => {
-        if (!params || !params.value) return null;
-        return <Box sx={{ wordBreak: "break-all" }}>{params.value}</Box>;
-      },
+      renderCell: (params) => (
+        <Box sx={{ wordBreak: "break-all" }}>{params.value}</Box>
+      ),
     },
-    { field: "env", headerName: "Env", width: 100, type: "string", filterable: true },
+    { field: "env", headerName: "Env", width: 100 },
     {
       field: "formattedTimestamp",
       headerName: "Timestamp",
-      width: 180,
-      type: "string",
-      filterable: true,
+      width: 200,
+      filterOperators: dateFilterOperators, // özel tarih filtresi
     },
     {
       field: "raw_content",
       headerName: "Raw Content",
-      width: 150,
+      width: 120,
       sortable: false,
       filterable: false,
-      renderCell: (params) => {
-        if (!params || !params.row) return null;
-        return (
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() =>
-              openRawContentModal(params.row.raw_content, `Raw Log - UUID: ${params.row.uuid || "Unknown"}`)
-            }
-          >
-            Görüntüle
-          </Button>
-        );
-      },
+      renderCell: (params) => (
+        <IconButton
+          size="small"
+          onClick={() =>
+            openRawContentModal(
+              params.row.raw_content,
+              `Raw Log - UUID: ${params.row.uuid || "Unknown"}`
+            )
+          }
+        >
+          <VisibilityIcon />
+        </IconButton>
+      ),
     },
   ];
 
   return (
-    <Box sx={{ p: 4, bgcolor: "#fff", borderRadius: 2, boxShadow: 1 }}>
+    <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#fff" }}>
       {loading && <Typography>⏳ Yükleniyor...</Typography>}
       {error && <Typography color="error">⚠️ {error}</Typography>}
 
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: "bold" }}>
+      <Typography
+        variant="h5"
+        sx={{ mb: 2, fontWeight: "bold", p: 2 }}
+      >
         📜 Beyanname API Logs
       </Typography>
 
-      <Box sx={{ height: 600, width: "100%" }}>
+      <Box sx={{ height: "85vh", width: "100%" }}>
         <DataGrid
           rows={logs}
           columns={columns}
@@ -193,7 +215,10 @@ export default function BeyannameApiLogsPage() {
           sortingOrder={["asc", "desc"]}
           filterMode="client"
           sx={{
-            "& .MuiDataGrid-columnHeaders": { bgcolor: "#f5f5f5", fontWeight: "bold" },
+            "& .MuiDataGrid-columnHeaders": {
+              bgcolor: "#f5f5f5",
+              fontWeight: "bold",
+            },
             "& .MuiDataGrid-cell": { fontSize: "0.875rem" },
           }}
         />
@@ -203,7 +228,10 @@ export default function BeyannameApiLogsPage() {
       <Dialog open={openModal} onClose={closeModal} maxWidth="lg" fullWidth>
         <DialogTitle>
           {modalTitle}
-          <IconButton onClick={closeModal} sx={{ position: "absolute", right: 8, top: 8 }}>
+          <IconButton
+            onClick={closeModal}
+            sx={{ position: "absolute", right: 8, top: 8 }}
+          >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -230,3 +258,4 @@ export default function BeyannameApiLogsPage() {
     </Box>
   );
 }
+  

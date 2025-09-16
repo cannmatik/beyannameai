@@ -41,7 +41,7 @@ export default function Navbar() {
     ...(isAdmin && !loading
       ? [
           { text: "Prompt Yönetimi", href: "/dashboard/prompts" },
-          { text: "Admin Panel", href: "/admin" },
+          { text: "Beyanname API Logs", href: "/apilogs" },
         ]
       : []),
   ];
