@@ -25,24 +25,31 @@ export default function BeyannameApiLogsPage() {
   const [modalContent, setModalContent] = useState("");
   const [modalTitle, setModalTitle] = useState("");
 
-  // Yeni: toplam kayıt sayısı ve limit
   const [totalCount, setTotalCount] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [fetchLimit, setFetchLimit] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("beyannameFetchLimit");
-      return saved ? parseInt(saved, 10) || 500 : 500; // default 500
+      return saved ? parseInt(saved, 10) || 500 : 500;
     }
     return 500;
   });
 
-  // Filtre ve sıralama için localStorage
   const [gridState, setGridState] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("beyannameGridState");
       return saved ? JSON.parse(saved) : null;
     }
     return null;
+  });
+
+  // Yeni: sütun genişlikleri için state
+  const [columnWidths, setColumnWidths] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("beyannameColumnWidths");
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
   });
 
   const uniqueVKNs = useMemo(
@@ -59,14 +66,12 @@ export default function BeyannameApiLogsPage() {
     [logs]
   );
 
-  // Logları çeken fonksiyon (limit kontrollü)
   const fetchLogs = useCallback(
     async (limit = fetchLimit) => {
       setLoading(true);
       try {
         const { data, error, count } = await supabase
           .from("beyanname_api_logs")
-          // Not: count: "estimated" performans için iyidir. Tam sayı istersen "exact" kullan.
           .select("*", { count: "estimated" })
           .order("id", { ascending: false })
           .limit(limit);
@@ -75,7 +80,6 @@ export default function BeyannameApiLogsPage() {
         setLogs(data ?? []);
         setTotalCount(count ?? 0);
         setLastUpdated(new Date());
-        // Seçim kalıcı olsun
         if (typeof window !== "undefined") {
           localStorage.setItem("beyannameFetchLimit", String(limit));
         }
@@ -88,9 +92,8 @@ export default function BeyannameApiLogsPage() {
     [fetchLimit]
   );
 
-  // İlk yükleme + subscription
   useEffect(() => {
-    fetchLogs(); // initial
+    fetchLogs();
     const channel = supabase
       .channel("beyanname_api_logs-changes")
       .on(
@@ -103,23 +106,28 @@ export default function BeyannameApiLogsPage() {
     return () => supabase.removeChannel(channel);
   }, [fetchLogs]);
 
-  // Limit değişince oto çekmek istersen aşağıyı aç.
-  // useEffect(() => {
-  //   fetchLogs();
-  // }, [fetchLimit, fetchLogs]);
-
-  // Grid state'i kaydet
   useEffect(() => {
     if (gridState) {
       localStorage.setItem("beyannameGridState", JSON.stringify(gridState));
     }
   }, [gridState]);
 
-  // Grid state değişimini optimize et
+  // sütun genişliği kaydet
+  const handleColumnWidthChange = useCallback(
+    (params) => {
+      setColumnWidths((prev) => {
+        const updated = { ...prev, [params.colDef.field]: params.width };
+        localStorage.setItem("beyannameColumnWidths", JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [setColumnWidths]
+  );
+
   const handleGridStateChange = useCallback((newState) => {
     setGridState((prevState) => {
       if (JSON.stringify(prevState) === JSON.stringify(newState)) {
-        return prevState; // Aynıysa güncelleme yapma
+        return prevState;
       }
       return newState;
     });
@@ -142,19 +150,19 @@ export default function BeyannameApiLogsPage() {
   };
 
   const columns = [
-    { field: "id", headerName: "ID", width: 90 },
-    { field: "uuid", headerName: "UUID", width: 200 },
+    { field: "id", headerName: "ID", width: columnWidths["id"] || 90 },
+    { field: "uuid", headerName: "UUID", width: columnWidths["uuid"] || 200 },
     {
       field: "vkn",
       headerName: "VKN",
-      width: 120,
+      width: columnWidths["vkn"] || 120,
       type: "singleSelect",
       valueOptions: uniqueVKNs,
     },
     {
       field: "direction",
       headerName: "Durum",
-      width: 120,
+      width: columnWidths["direction"] || 120,
       type: "singleSelect",
       valueOptions: uniqueDirections,
       renderCell: (params) => {
@@ -182,27 +190,27 @@ export default function BeyannameApiLogsPage() {
     {
       field: "method",
       headerName: "Method",
-      width: 120,
+      width: columnWidths["method"] || 120,
       type: "singleSelect",
       valueOptions: uniqueMethods,
     },
-    { field: "url", headerName: "URL", width: 250 },
-    { field: "env", headerName: "Env", width: 100 },
+    { field: "url", headerName: "URL", width: columnWidths["url"] || 250 },
+    { field: "env", headerName: "Env", width: columnWidths["env"] || 100 },
     {
       field: "timestamp",
       headerName: "Tarih",
-      width: 180,
+      width: columnWidths["timestamp"] || 180,
       renderCell: (params) => {
         if (!params.value) return "";
         const date = new Date(params.value);
-        date.setHours(date.getHours() + 3); // UTC +3 Türkiye
+        date.setHours(date.getHours() + 3);
         return date.toLocaleString("tr-TR");
       },
     },
     {
       field: "raw_content",
       headerName: "Detay",
-      width: 100,
+      width: columnWidths["raw_content"] || 100,
       sortable: false,
       filterable: false,
       renderCell: (params) => (
@@ -233,7 +241,6 @@ export default function BeyannameApiLogsPage() {
         🧾 Beyanname API Logs
       </Typography>
 
-      {/* Üst Kontrol Şeridi: Limit seçimi + butonlar + sayım */}
       <Box
         sx={{
           display: "flex",
@@ -282,6 +289,7 @@ export default function BeyannameApiLogsPage() {
           slotProps={{ toolbar: { showQuickFilter: true } }}
           sortingMode="client"
           filterMode="client"
+          onColumnWidthChange={handleColumnWidthChange}
           localeText={{
             toolbarColumns: "Sütunlar",
             toolbarFilters: "Filtreler",
@@ -300,9 +308,12 @@ export default function BeyannameApiLogsPage() {
               justifyContent: "flex-end",
               color: "#800020",
             },
-            "& .MuiDataGrid-columnHeaders": { bgcolor: "#f5f5f5", fontWeight: "bold" },
+            "& .MuiDataGrid-columnHeaders": {
+              bgcolor: "#f5f5f5",
+              fontWeight: "bold",
+            },
             "& .MuiDataGrid-cell": { fontSize: "0.875rem" },
-            "& .MuiDataGrid-virtualScroller": { overflowX: "hidden" },
+            "& .MuiDataGrid-virtualScroller": { overflowX: "auto" }, // mobil scroll aktif
             "& .MuiButtonBase-root": { color: "#800020" },
           }}
         />
