@@ -57,6 +57,9 @@ export default function LoginPage() {
               fullWidth
               className="form-input"
               sx={{ mb: 2 }}
+              id="email" // <-- EKLENDİ
+              name="email" // <-- EKLENDİ
+              autoComplete="email" // <-- EKLENDİ
             />
             <TextField
               type={showPassword ? "text" : "password"}
@@ -68,6 +71,9 @@ export default function LoginPage() {
               fullWidth
               className="form-input"
               sx={{ mb: 2 }}
+              id="password" // <-- EKLENDİ
+              name="password" // <-- EKLENDİ
+              autoComplete="current-password" // <-- EKLENDİ
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
