@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
@@ -11,6 +11,8 @@ import {
   Typography,
   InputAdornment,
   IconButton,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import Visibility from "@mui/icons-material/Visibility";
@@ -23,15 +25,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Component mount olduğunda önce session ve remembered email kontrolü
+  useEffect(() => {
+    const session = supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.push("/dashboard"); // Oturum varsa direkt yönlendir
+      }
+    });
+
+    const savedEmail = localStorage.getItem("rememberedEmail");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, [router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+
     if (error) {
       setError(error.message);
     } else {
+      // Beni Hatırla seçiliyse emaili localStorage'a kaydet
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", email);
+      } else {
+        localStorage.removeItem("rememberedEmail");
+      }
+
       router.push("/dashboard");
     }
   };
@@ -46,10 +72,12 @@ export default function LoginPage() {
           <h2 className="card-title">Giriş Yap</h2>
           {error && <div className="error-message">{error}</div>}
 
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} autoComplete="on">
             <TextField
+              id="email"
+              name="email"
               type="email"
-              variant="outlined"
+              label="E-posta"
               placeholder="E-posta"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -57,13 +85,14 @@ export default function LoginPage() {
               fullWidth
               className="form-input"
               sx={{ mb: 2 }}
-              id="email" // <-- EKLENDİ
-              name="email" // <-- EKLENDİ
-              autoComplete="email" // <-- EKLENDİ
+              autoComplete="email"
             />
+
             <TextField
+              id="password"
+              name="password"
               type={showPassword ? "text" : "password"}
-              variant="outlined"
+              label="Şifre"
               placeholder="Şifre"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -71,9 +100,7 @@ export default function LoginPage() {
               fullWidth
               className="form-input"
               sx={{ mb: 2 }}
-              id="password" // <-- EKLENDİ
-              name="password" // <-- EKLENDİ
-              autoComplete="current-password" // <-- EKLENDİ
+              autoComplete="current-password"
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -87,7 +114,22 @@ export default function LoginPage() {
                   </InputAdornment>
                 ),
               }}
+              inputProps={{ autoComplete: "current-password" }}
             />
+
+            {/* Beni Hatırla Checkbox */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Beni Hatırla"
+              sx={{ mb: 2 }}
+            />
+
             <Button
               type="submit"
               variant="contained"
